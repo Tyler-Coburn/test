@@ -85,7 +85,6 @@
     "wasi-js": "^1.7.3"
   },
   "devDependencies": {
-    "7z-wasm": "^1.2.0",
     "@axe-core/playwright": "^4.10.2",
     "@next/bundle-analyzer": "^15.5.2",
     "@next/eslint-plugin-next": "^15.5.2",
@@ -108,6 +107,7 @@
     "@types/wicg-file-system-access": "^2023.10.6",
     "@typescript-eslint/eslint-plugin": "^8.42.0",
     "@typescript-eslint/parser": "^8.42.0",
+    "7z-wasm": "^1.2.0",
     "emulators": "^8.3.9",
     "emulators-ui": "^0.73.9",
     "eruda": "^3.4.3",
@@ -151,7 +151,7 @@
     "terser": "^5.44.0",
     "tinymce": "^7.9.1",
     "ts-prune": "^0.10.3",
-    "typescript": "^5.9.2",
+    "typescript": "^5.9.3",
     "webamp": "^2.2.0",
     "xlsx": "^0.18.5",
     "xterm": "^5.3.0"

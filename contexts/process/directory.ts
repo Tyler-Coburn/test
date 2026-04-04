@@ -329,6 +329,17 @@ const directory: Processes = {
     lockAspectRatio: true,
     title: "TIC-80 tiny computer",
   },
+  TapID: {
+    Component: dynamic(() => import("components/apps/TapID")),
+    backgroundColor: "#0f0f1a",
+    defaultSize: {
+      height: 580,
+      width: 420,
+    },
+    icon: "/System/Icons/tapid.webp",
+    singleton: true,
+    title: "TapID",
+  },
   TinyMCE: {
     Component: dynamic(() => import("components/apps/TinyMCE")),
     backgroundColor: "#202124",

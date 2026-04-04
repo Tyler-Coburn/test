@@ -5,6 +5,9 @@ out
 
 node_modules
 
+package-lock.json
+tsconfig.tsbuildinfo
+
 test-results
 playwright-report
 playwright/.cache
@@ -20,6 +23,7 @@ public/Users/Public/**
 !public/Users/Public/Desktop
 !public/Users/Public/Desktop/My PC.url
 !public/Users/Public/Desktop/Public.url
+!public/Users/Public/Desktop/TapID.url
 !public/Users/Public/Documents
 !public/Users/Public/Music
 !public/Users/Public/Pictures
