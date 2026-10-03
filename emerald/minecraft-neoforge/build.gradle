@@ -1,0 +1,89 @@
+plugins {
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+base {
+    archivesName = mod_id
+}
+
+// One mod jar: the pure modules' sources compile straight into it, so no jar-in-jar is needed.
+// simulation-core and ai still build and test on their own without Minecraft.
+sourceSets.main.java.srcDirs += [
+        "${rootDir}/simulation-core/src/main/java",
+        "${rootDir}/ai/src/main/java"
+]
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+        gameTestServer {
+            type = 'gameTestServer'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'SmartBrainLib'
+                url = 'https://dl.cloudsmith.io/public/tslat/sbl/maven/'
+            }
+        }
+        filter { includeGroup 'net.tslat.smartbrainlib' }
+    }
+}
+
+dependencies {
+    // SmartBrainLib executes body behaviour only (MPL-2.0, depended on, not shaded).
+    implementation "net.tslat.smartbrainlib:SmartBrainLib-neoforge-${minecraft_version}:${sbl_version}"
+}
+
+def replaceProperties = [
+        minecraft_version      : minecraft_version,
+        minecraft_version_range: minecraft_version_range,
+        neo_version            : neo_version,
+        neo_version_range      : neo_version_range,
+        loader_version_range   : loader_version_range,
+        mod_id                 : mod_id,
+        mod_name               : mod_name,
+        mod_license            : mod_license,
+        mod_version            : mod_version,
+        mod_authors            : mod_authors,
+        mod_description        : mod_description,
+        sbl_version_range      : sbl_version_range
+]
+
+tasks.named('processResources', ProcessResources) {
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties
+    }
+}
