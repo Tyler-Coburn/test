@@ -1,0 +1,12 @@
+{
+  "entity.emerald.civ_villager": "Citizen",
+  "emerald.concept.chicken_laying": "Chickens lay eggs",
+  "emerald.concept.item_entity_spawn": "Items appear in the world",
+  "emerald.concept.hopper_pulls_item": "Hoppers pull items from above",
+  "emerald.concept.chest_stores_item": "Chests store items",
+  "emerald.concept.crop_growth": "Crops grow",
+  "emerald.concept.crop_harvest": "Mature crops can be harvested",
+  "emerald.concept.water_pushes_item": "Flowing water pushes items",
+  "emerald.concept.piston_moves_block": "Pistons move blocks",
+  "emerald.concept.redstone_signal": "Redstone carries signals"
+}
