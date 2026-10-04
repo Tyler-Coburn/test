@@ -31,8 +31,16 @@ class UtilityScorerTest {
     }
 
     @Test
-    void childrenDoNotWork() {
-        assertEquals(0.0, UtilityScorer.score(new UtilityInputs(0, 100, false, false, Role.CHILD, 50)).get(Need.WORK));
+    void childrenStudyByDayButLessThanAdultsWork() {
+        double child = UtilityScorer.score(new UtilityInputs(0, 100, false, false, Role.CHILD, 50)).get(Need.WORK);
+        double adult = UtilityScorer.score(new UtilityInputs(0, 100, false, false, Role.FARMER, 50)).get(Need.WORK);
+        assertTrue(child > 0 && child < adult);
+        assertEquals(0.0, UtilityScorer.score(new UtilityInputs(0, 100, false, true, Role.CHILD, 50)).get(Need.WORK));
+    }
+
+    @Test
+    void guardsDefendInsteadOfFleeing() {
+        assertEquals(Need.WORK, UtilityScorer.pick(new UtilityInputs(20, 80, true, false, Role.GUARD, 90)));
     }
 
     @Test

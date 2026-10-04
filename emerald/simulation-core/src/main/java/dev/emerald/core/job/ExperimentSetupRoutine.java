@@ -27,6 +27,11 @@ public final class ExperimentSetupRoutine extends AbstractRoutine {
     }
 
     @Override
+    public dev.emerald.core.citizen.SkillType skill() {
+        return dev.emerald.core.citizen.SkillType.RESEARCH;
+    }
+
+    @Override
     public TaskType task() {
         return TaskType.SETUP_EXPERIMENT;
     }
@@ -37,7 +42,7 @@ public final class ExperimentSetupRoutine extends AbstractRoutine {
         var me = ctx.citizen();
         Optional<Experiment> found = v.experiments().get(experimentId);
         if (found.isEmpty() || found.get().phase() != Experiment.Phase.SETUP) {
-            return RoutineStatus.DONE;
+            return RoutineStatus.NOTHING;
         }
         Experiment e = found.get();
         Pos at = e.apparatus();

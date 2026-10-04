@@ -29,8 +29,8 @@ import java.util.UUID;
  * </ul>
  */
 public final class ExperimentEngine {
-    /** Structure a builder will place for an adopted chicken collector (authored later, see MANUAL_STEPS). */
-    public static final String COLLECTOR_BLUEPRINT = "emerald:hopper_pen";
+    /** Structure a builder places for an adopted chicken collector. */
+    public static final String COLLECTOR_BLUEPRINT = dev.emerald.core.construction.Blueprints.COLLECTOR;
     public static final List<ConceptId> COLLECTOR_REQUIRES =
             List.of(ConceptId.CHICKEN_LAYING, ConceptId.HOPPER_PULLS_ITEM, ConceptId.CHEST_STORES_ITEM);
 

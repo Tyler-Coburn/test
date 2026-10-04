@@ -20,14 +20,21 @@ public final class UtilityScorer {
         double tiredness = (100 - in.energy()) / 100.0;
 
         double flee = in.threatened() ? 0.6 + in.caution() / 250.0 : 0.0;
+        boolean defender = in.role() == Role.GUARD;
         double eat = hunger < 0.35 ? hunger * 0.5 : hunger;
         double sleep = tiredness * (in.night() ? 1.0 : 0.5);
         if (in.night() && in.role() != Role.GUARD) {
             sleep = Math.max(sleep, 0.75);
         }
-        double work = in.role() == Role.CHILD ? 0.0 : 0.7 * (1.0 - hunger * 0.5) * (in.night() ? 0.3 : 1.0);
-        if (in.role() == Role.GUARD && in.night()) {
+        double work = in.role() == Role.CHILD
+                ? (in.night() ? 0.0 : 0.35)   // children study by day
+                : 0.7 * (1.0 - hunger * 0.5) * (in.night() ? 0.3 : 1.0);
+        if (defender && in.night()) {
             work = 0.7;
+        }
+        if (defender && in.threatened()) {
+            work = 1.0;   // a guard's work under threat is defence, not flight
+            flee = 0.0;
         }
 
         scores.put(Need.FLEE, round(flee));

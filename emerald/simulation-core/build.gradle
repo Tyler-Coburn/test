@@ -4,3 +4,12 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
+
+// Headless end-to-end run of the first slice: ./gradlew -Pemerald.coreOnly=true :simulation-core:sandbox [-Pseed=N]
+tasks.register('sandbox', JavaExec) {
+    group = 'emerald'
+    description = 'Runs the first-slice village scenario without Minecraft and writes build/sandbox-report.md'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'dev.emerald.core.sandbox.SandboxMain'
+    args = [project.findProperty('seed') ?: '7', "${buildDir}/sandbox-report.md"]
+}

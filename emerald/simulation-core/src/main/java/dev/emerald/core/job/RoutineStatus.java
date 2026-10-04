@@ -1,3 +1,4 @@
 package dev.emerald.core.job;
 
-public enum RoutineStatus { RUNNING, DONE, FAILED }
+/** RUNNING, DONE (did real work), FAILED (with a reason), NOTHING (no work available; not a completion). */
+public enum RoutineStatus { RUNNING, DONE, FAILED, NOTHING }

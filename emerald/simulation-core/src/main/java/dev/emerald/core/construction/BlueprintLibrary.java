@@ -12,6 +12,7 @@ public final class BlueprintLibrary {
     public static BlueprintLibrary withDefaults() {
         BlueprintLibrary lib = new BlueprintLibrary();
         lib.register(Blueprints.fallbackHut(), "built-in fallback");
+        lib.register(Blueprints.collector(), "built-in design");
         return lib;
     }
 
@@ -21,7 +22,14 @@ public final class BlueprintLibrary {
     }
 
     public Optional<Blueprint> get(String id) {
-        return Optional.ofNullable(blueprints.get(id));
+        Blueprint b = blueprints.get(id);
+        if (b == null) {
+            b = Blueprints.fromId(id);
+            if (b != null) {
+                register(b, "generated from pen size");
+            }
+        }
+        return Optional.ofNullable(b);
     }
 
     public String source(String id) {

@@ -34,12 +34,22 @@ public record DesignRevision(
     }
 
     public String label() {
-        return designId + " Mk " + roman(revision) + (adopted ? " [adopted]" : failures > 0 ? " [failed]" : "");
+        return designId + " Mk " + roman(revision) + (adopted ? " [adopted]" : failures > 0 ? " [failed]" : " [prototype]");
     }
 
     DesignRevision withAdopted(boolean value) {
         return new DesignRevision(designId, revision, cost, measuredOutput, failures, value, inventor,
                 experimentId, requires, blueprintId, createdAt);
+    }
+
+    DesignRevision withResult(int output, int failures, boolean adopted) {
+        return new DesignRevision(designId, revision, cost, output, failures, adopted, inventor,
+                experimentId, requires, blueprintId, createdAt);
+    }
+
+    /** A prototype awaiting its field trial: not adopted, not failed. */
+    public boolean inTrial() {
+        return !adopted && failures == 0 && blueprintId != null;
     }
 
     static String roman(int n) {

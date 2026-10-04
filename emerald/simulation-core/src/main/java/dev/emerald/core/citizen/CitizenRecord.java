@@ -7,6 +7,7 @@ import dev.emerald.core.knowledge.KnowledgeBook;
 import dev.emerald.core.utility.Need;
 import dev.emerald.core.world.Pos;
 
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -35,6 +36,8 @@ public final class CitizenRecord {
     private String taskDetail = "";
     private String deathCause;
     private long diedAt = -1;
+    private Role jobOverride;
+    private final Map<SkillType, Integer> skillXp = new EnumMap<>(SkillType.class);
     private final ItemCounter carried = new ItemCounter(64 * 9);
     private final KnowledgeBook knowledge = new KnowledgeBook();
 
@@ -66,6 +69,17 @@ public final class CitizenRecord {
     public long diedAt() { return diedAt; }
     public ItemCounter carried() { return carried; }
     public KnowledgeBook knowledge() { return knowledge; }
+    /** Temporary job assigned by the director (e.g. a general farming during FOOD_LOW), or null. */
+    public Role jobOverride() { return jobOverride; }
+    public void setJobOverride(Role job) { this.jobOverride = job; }
+    /** The job actually worked: the director's override, else the citizen's role. */
+    public Role effectiveRole() { return jobOverride != null ? jobOverride : role; }
+    public int xp(SkillType skill) { return skillXp.getOrDefault(skill, 0); }
+    public int skillLevel(SkillType skill) { return SkillType.levelFor(xp(skill)); }
+    public void addXp(SkillType skill, int amount) {
+        if (amount > 0) skillXp.merge(skill, amount, Integer::sum);
+    }
+    public Map<SkillType, Integer> skills() { return Map.copyOf(skillXp); }
 
     public void setName(String name) { this.name = name; }
     public void setRole(Role role) { this.role = role; }
@@ -120,6 +134,10 @@ public final class CitizenRecord {
         m.put("taskDetail", taskDetail);
         if (deathCause != null) m.put("deathCause", deathCause);
         m.put("diedAt", diedAt);
+        if (jobOverride != null) m.put("jobOverride", jobOverride.name());
+        Map<String, Object> xp = Data.map();
+        skillXp.forEach((k, v) -> xp.put(k.name(), v));
+        m.put("skills", xp);
         m.put("carried", carried.toList());
         m.put("knowledge", knowledge.toList());
         return m;
@@ -142,6 +160,17 @@ public final class CitizenRecord {
         r.taskDetail = Data.strOr(m, "taskDetail", "");
         r.deathCause = Data.strOr(m, "deathCause", null);
         r.diedAt = Data.lOr(m, "diedAt", -1);
+        r.jobOverride = Data.enumOr(m, "jobOverride", Role.class, null);
+        Map<String, Object> xp = Data.subOrNull(m, "skills");
+        if (xp != null) {
+            xp.forEach((k, v) -> {
+                try {
+                    r.skillXp.put(SkillType.valueOf(k), ((Number) v).intValue());
+                } catch (IllegalArgumentException ignored) {
+                    // skill removed in a later version
+                }
+            });
+        }
         r.carried.loadFrom(Data.maps(m, "carried"));
         r.knowledge.loadFrom(Data.maps(m, "knowledge"));
         return r;

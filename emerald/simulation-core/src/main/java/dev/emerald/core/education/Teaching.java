@@ -32,10 +32,12 @@ public final class Teaching {
         if (entry.get().sourceObservation() == null) {
             return Result.NO_EVIDENCE;
         }
-        int confidence = entry.get().confidence() * (50 + teacher.curiosity() / 2) / 100;
+        int skill = teacher.skillLevel(dev.emerald.core.citizen.SkillType.TEACHING);
+        int confidence = Math.min(100, entry.get().confidence() * (50 + teacher.curiosity() / 2 + 5 * skill) / 100);
         if (!student.knowledge().receiveTeaching(entry.get(), confidence, now)) {
             return Result.ALREADY_KNOWN;
         }
+        teacher.addXp(dev.emerald.core.citizen.SkillType.TEACHING, 3);
         v.log("KNOWLEDGE_TAUGHT", now, null, teacher.id(), student.id(), entry.get().sourceObservation(), null,
                 Provenance.TEACHING, "concept", concept.name(), "teacherState", entry.get().state().name(),
                 "studentState", student.knowledge().state(concept).name());

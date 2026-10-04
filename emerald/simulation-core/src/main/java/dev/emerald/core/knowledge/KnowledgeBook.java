@@ -81,6 +81,27 @@ public final class KnowledgeBook {
         return true;
     }
 
+    /**
+     * Reads authoritative documentation. A writing cites the observation that proved it, so the
+     * reader may take its tested state; confirmed truths are never downgraded by a negative writing.
+     * Returns true if the reader's state changed.
+     */
+    public boolean readWriting(dev.emerald.core.education.Writing w, long gameTime) {
+        KnowState current = state(w.concept());
+        if (w.sourceObservation() == null || !w.state().isTested()) {
+            return false;
+        }
+        if (current.isConfirmedTrue() || current == w.state()) {
+            return false;
+        }
+        if (w.state() == KnowState.TESTED_FALSE && current == KnowState.TESTED_FALSE) {
+            return false;
+        }
+        entries.put(w.concept(), new KnowledgeEntry(w.concept(), w.state(), w.sourceObservation(), w.experimentId(),
+                gameTime, 75, KnowledgeSource.DOCUMENT));
+        return true;
+    }
+
     /** Marks a concept as under hypothesis. Tested knowledge is never downgraded. */
     public void hypothesize(ConceptId concept, long gameTime) {
         KnowState s = state(concept);

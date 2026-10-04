@@ -58,6 +58,26 @@ public final class DesignRegistry {
         return false;
     }
 
+    /** Field-trial outcome for a stored revision. */
+    public boolean conclude(String designId, int revision, int output, boolean success) {
+        for (int i = 0; i < revisions.size(); i++) {
+            DesignRevision r = revisions.get(i);
+            if (r.designId().equals(designId) && r.revision() == revision) {
+                revisions.set(i, r.withResult(output, success ? 0 : r.failures() + 1, success));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public java.util.Optional<DesignRevision> get(String designId, int revision) {
+        return revisions.stream().filter(r -> r.designId().equals(designId) && r.revision() == revision).findFirst();
+    }
+
+    public java.util.Optional<DesignRevision> inTrial(String designId) {
+        return revisions.stream().filter(r -> r.designId().equals(designId) && r.inTrial()).findFirst();
+    }
+
     public List<Object> toList() {
         return revisions.stream().<Object>map(DesignRevision::toMap).toList();
     }

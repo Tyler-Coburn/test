@@ -10,6 +10,9 @@ import java.util.UUID;
 public final class ConstructionProject {
     public enum State { ACTIVE, COMPLETE, ABANDONED }
 
+    /** Why the project exists. */
+    public enum Purpose { HOUSING, DESIGN, ORDERED }
+
     private final UUID id;
     private final String blueprintId;
     private final Pos origin;
@@ -18,6 +21,9 @@ public final class ConstructionProject {
     private State state = State.ACTIVE;
     private int placed;
     private long completedAt = -1;
+    private Purpose purpose = Purpose.ORDERED;
+    private String designId;
+    private int designRevision;
 
     public ConstructionProject(UUID id, String blueprintId, Pos origin, UUID builder, long createdAt) {
         this.id = id;
@@ -35,6 +41,16 @@ public final class ConstructionProject {
     public State state() { return state; }
     public int placed() { return placed; }
     public long completedAt() { return completedAt; }
+    public Purpose purpose() { return purpose; }
+    public String designId() { return designId; }
+    public int designRevision() { return designRevision; }
+
+    public ConstructionProject withPurpose(Purpose purpose, String designId, int designRevision) {
+        this.purpose = purpose;
+        this.designId = designId;
+        this.designRevision = designRevision;
+        return this;
+    }
 
     public void setBuilder(UUID builder) { this.builder = builder; }
     public void notePlaced() { placed++; }
@@ -58,6 +74,9 @@ public final class ConstructionProject {
         m.put("state", state.name());
         m.put("placed", placed);
         m.put("completed", completedAt);
+        m.put("purpose", purpose.name());
+        if (designId != null) m.put("design", designId);
+        m.put("designRev", designRevision);
         return m;
     }
 
@@ -67,6 +86,9 @@ public final class ConstructionProject {
         p.state = Data.enumOf(m, "state", State.class);
         p.placed = Data.iOr(m, "placed", 0);
         p.completedAt = Data.lOr(m, "completed", -1);
+        p.purpose = Data.enumOr(m, "purpose", Purpose.class, Purpose.ORDERED);
+        p.designId = Data.strOr(m, "design", null);
+        p.designRevision = Data.iOr(m, "designRev", 0);
         return p;
     }
 }

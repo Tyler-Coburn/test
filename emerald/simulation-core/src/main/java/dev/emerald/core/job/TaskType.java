@@ -11,5 +11,9 @@ public enum TaskType {
     BUILD,
     SETUP_EXPERIMENT,
     WATCH_EXPERIMENT,
-    PATROL
+    PATROL,
+    DEFEND,
+    TEACH,
+    WRITE_BOOK,
+    STUDY
 }

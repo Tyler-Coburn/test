@@ -29,6 +29,11 @@ public final class BuilderRoutine extends AbstractRoutine {
     }
 
     @Override
+    public dev.emerald.core.citizen.SkillType skill() {
+        return dev.emerald.core.citizen.SkillType.BUILDING;
+    }
+
+    @Override
     public TaskType task() {
         return TaskType.BUILD;
     }
@@ -40,7 +45,7 @@ public final class BuilderRoutine extends AbstractRoutine {
         long now = ctx.now();
         Optional<ConstructionProject> found = v.construction().get(projectId);
         if (found.isEmpty() || found.get().state() != ConstructionProject.State.ACTIVE) {
-            return RoutineStatus.DONE;
+            return RoutineStatus.NOTHING;
         }
         ConstructionProject project = found.get();
         Optional<Blueprint> blueprint = ctx.blueprints().get(project.blueprintId());
@@ -54,8 +59,14 @@ public final class BuilderRoutine extends AbstractRoutine {
         }
         if (remaining.isEmpty()) {
             project.complete(now);
+            int beds = project.blueprintId().equals(dev.emerald.core.construction.Blueprints.HUT) ? VillageDirector.BEDS_PER_HUT : 0;
             Building b = v.construction().register(new Building(UUID.randomUUID(), project.blueprintId(),
-                    project.origin(), now, project.id(), VillageDirector.BEDS_PER_HUT));
+                    project.origin(), now, project.id(), beds));
+            v.snapshot().clearRemaining(project.id());
+            if (project.purpose() == ConstructionProject.Purpose.DESIGN) {
+                v.log("DESIGN_INSTALLED", now, project.origin(), me.id(), b.id(), null, project.id(), Provenance.JOB_SYSTEM,
+                        "design", String.valueOf(project.designId()), "revision", String.valueOf(project.designRevision()));
+            }
             v.log("BUILDING_COMPLETED", now, project.origin(), me.id(), b.id(), null, project.id(),
                     Provenance.JOB_SYSTEM, "blueprint", project.blueprintId(), "placed", String.valueOf(project.placed()));
             detail = "completed " + project.blueprintId();
@@ -84,6 +95,8 @@ public final class BuilderRoutine extends AbstractRoutine {
             return fail("placement refused at " + target);
         }
         project.notePlaced();
+        v.economy().consumed(next.itemId(), 1, now);
+        me.addXp(dev.emerald.core.citizen.SkillType.BUILDING, 1);
         v.observations().record(ObservationType.BLOCK_PLACED, ctx.world().dimension(), target, next.itemId(),
                 me.id(), now, null);
         return RoutineStatus.RUNNING;
@@ -97,7 +110,7 @@ public final class BuilderRoutine extends AbstractRoutine {
             if (!ctx.world().isLoaded(p)) {
                 return null;
             }
-            if (!ctx.world().matches(p, b)) {
+            if (!ctx.world().matches(p, b) && !ctx.village().pending().isQueued(p)) {
                 out.add(b);
             }
         }

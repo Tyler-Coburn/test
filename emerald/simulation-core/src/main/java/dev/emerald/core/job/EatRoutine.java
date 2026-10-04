@@ -17,6 +17,7 @@ public final class EatRoutine extends AbstractRoutine {
         var c = ctx.citizen();
         String eaten = NeedsModel.eatFromCarried(c);
         if (eaten != null) {
+            ctx.village().economy().consumed(eaten, 1, ctx.now());
             detail = "ate " + eaten;
             return RoutineStatus.DONE;
         }
@@ -40,7 +41,9 @@ public final class EatRoutine extends AbstractRoutine {
             }
             if (best != null && store.extract(best, 1) == 1) {
                 c.carried().insert(best, 1);
-                detail = "ate " + NeedsModel.eatFromCarried(c) + " from warehouse";
+                NeedsModel.eatFromCarried(c);
+                ctx.village().economy().consumed(best, 1, ctx.now());
+                detail = "ate " + best + " from warehouse";
                 return RoutineStatus.DONE;
             }
         }

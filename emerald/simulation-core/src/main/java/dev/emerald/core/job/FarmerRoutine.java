@@ -23,6 +23,11 @@ public final class FarmerRoutine extends AbstractRoutine {
     private UUID lastHarvest;
 
     @Override
+    public dev.emerald.core.citizen.SkillType skill() {
+        return dev.emerald.core.citizen.SkillType.FARMING;
+    }
+
+    @Override
     public TaskType task() {
         return TaskType.HARVEST_CROPS;
     }
@@ -46,7 +51,7 @@ public final class FarmerRoutine extends AbstractRoutine {
                     step = Step.TO_WAREHOUSE;
                 } else {
                     detail = "no mature wheat";
-                    return RoutineStatus.DONE;
+                    return RoutineStatus.NOTHING;
                 }
                 return RoutineStatus.RUNNING;
             }
@@ -84,6 +89,7 @@ public final class FarmerRoutine extends AbstractRoutine {
                 int spareSeeds = Math.max(0, c.carried().count(ItemIds.WHEAT_SEEDS) - SEED_RESERVE);
                 c.carried().extract(ItemIds.WHEAT_SEEDS, store.insert(ItemIds.WHEAT_SEEDS, spareSeeds));
                 if (stored > 0) {
+                    ctx.village().economy().produced(ItemIds.WHEAT, stored, ctx.now());
                     ctx.village().observations().record(ObservationType.ITEM_STORED,
                             ctx.world().dimension(), wh, ItemIds.WHEAT, c.id(), ctx.now(), lastHarvest);
                 }

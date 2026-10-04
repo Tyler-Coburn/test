@@ -24,7 +24,7 @@ public final class WatchExperimentRoutine extends AbstractRoutine {
         var e = ctx.village().experiments().get(experimentId);
         if (e.isEmpty() || e.get().phase() != Experiment.Phase.RUNNING) {
             detail = "experiment over";
-            return RoutineStatus.DONE;
+            return RoutineStatus.NOTHING;
         }
         Box pen = e.get().region();
         Pos spot = new Pos(pen.max().x() + 2, pen.min().y(), (pen.min().z() + pen.max().z()) / 2);

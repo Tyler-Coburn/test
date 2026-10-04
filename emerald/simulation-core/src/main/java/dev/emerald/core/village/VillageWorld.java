@@ -59,7 +59,10 @@ public final class VillageWorld {
 
     /** Founds a village with six citizen records (FARMER..CHILD). No bodies are created here. */
     public VillageState found(String name, String dimension, Pos center, long now, long seed) {
-        VillageState v = new VillageState(UUID.randomUUID(), name, dimension, center, now, config);
+        // Deterministic id: replays with the same seed, time and site produce the same village.
+        UUID id = UUID.nameUUIDFromBytes((seed + "|" + now + "|" + dimension + "|" + center + "|" + name)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        VillageState v = new VillageState(id, name, dimension, center, now, config);
         List<CitizenRecord> founders = FounderFactory.founders(v.id(), seed ^ now);
         for (CitizenRecord c : founders) {
             c.setHome(center);

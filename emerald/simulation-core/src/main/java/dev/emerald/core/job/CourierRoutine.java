@@ -19,6 +19,11 @@ public final class CourierRoutine extends AbstractRoutine {
     }
 
     @Override
+    public dev.emerald.core.citizen.SkillType skill() {
+        return dev.emerald.core.citizen.SkillType.LOGISTICS;
+    }
+
+    @Override
     public TaskType task() {
         return TaskType.DELIVER_REQUEST;
     }
@@ -45,7 +50,7 @@ public final class CourierRoutine extends AbstractRoutine {
                     step = Step.TO_WAREHOUSE;
                 } else {
                     detail = "request no longer claimable (" + r.state() + ")";
-                    return RoutineStatus.DONE;
+                    return RoutineStatus.NOTHING;
                 }
                 return RoutineStatus.RUNNING;
             }

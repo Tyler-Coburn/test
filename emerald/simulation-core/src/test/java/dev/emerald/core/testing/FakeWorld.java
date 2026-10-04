@@ -61,7 +61,7 @@ public final class FakeWorld implements WorldPort {
             }
         }
         if (time % 20 == 0) {
-            VillageSimulator.tick(v, time, warehouse, config, hypotheses);
+            VillageSimulator.tick(v, this, config, hypotheses == null ? HypothesisSource.FALLBACK : hypotheses, blueprints);
         }
     }
 
@@ -74,6 +74,39 @@ public final class FakeWorld implements WorldPort {
     @Override public long gameTime() { return time; }
     @Override public String dimension() { return DIM; }
     @Override public ItemStore warehouse() { return warehouse; }
+
+    public final Map<Pos, ItemCounter> containers = new HashMap<>();
+
+    @Override
+    public ItemStore containerAt(Pos pos) {
+        return containers.get(pos);
+    }
+
+    @Override
+    public int countCropPlots(Pos center, int radius) {
+        return crops.size();
+    }
+
+    @Override
+    public int countAnimals(dev.emerald.core.world.Box region, String entityId) {
+        return 0;
+    }
+
+    @Override
+    public boolean placeMaterialized(Pos pos, BlueprintBlock block) {
+        if (blocks.containsKey(pos)) return false;
+        blocks.put(pos, block.blockId());
+        return true;
+    }
+
+    /** Sites returned in order; empty list = no free site. */
+    public final java.util.List<Pos> sites = new java.util.ArrayList<>();
+
+    @Override
+    public Optional<Pos> findBuildSite(Pos center, int sizeX, int sizeZ, int minDist, int maxDist,
+                                       java.util.List<dev.emerald.core.world.Box> avoid) {
+        return sites.isEmpty() ? Optional.empty() : Optional.of(sites.remove(0));
+    }
 
     @Override
     public Optional<Pos> findMatureCrop(Pos center, int radius) {

@@ -25,6 +25,19 @@ public final class ConstructionRegistry {
         return Optional.ofNullable(projects.get(id));
     }
 
+    public List<ConstructionProject> active() {
+        return projects.values().stream().filter(p -> p.state() == ConstructionProject.State.ACTIVE).toList();
+    }
+
+    public boolean hasActive(ConstructionProject.Purpose purpose, String designId) {
+        return active().stream().anyMatch(p -> p.purpose() == purpose
+                && (designId == null || designId.equals(p.designId())));
+    }
+
+    public boolean hasBuilding(String type) {
+        return buildings.stream().anyMatch(b -> b.type().equals(type));
+    }
+
     public Optional<ConstructionProject> activeFor(UUID builder) {
         return projects.values().stream()
                 .filter(p -> p.state() == ConstructionProject.State.ACTIVE && builder.equals(p.builder()))
