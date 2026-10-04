@@ -2,40 +2,74 @@
 
 ## Source-of-truth rules
 
-1. **CitizenRecord is the person; CivVillager is only the loaded body.** Records live in `VillageSavedData` (`data/emerald_villages.dat` in the overworld). The entity stores only the UUID of the record it embodies. Unloading a body unbinds it; killing a body marks the record dead and keeps it.
-2. **The Minecraft server is authoritative for physical facts.** Job routines act through `WorldPort`, and every item transfer is a real container change.
-3. **Facts come only from the ObservationBus.** `ObservationBus.record` is called only by server-side adapters (`ObservationAdapter`, and routines after the world confirmed an action). `KnowledgeBook.witness` rejects observations that are not on the bus. `TESTED_TRUE`/`TESTED_FALSE` can only be set with an `ExperimentOutcome`, and its factories require bus evidence.
-4. **SmartBrainLib executes body behaviour only.** `WalkToTaskTarget` and `FleeThreat` read a walk goal or flee flag that the job layer wrote. Utility scoring, jobs, research and strategy live in `simulation-core`.
-5. **The LLM is proposal-only.** The `ai` module can return exactly one action, `PROPOSE_HYPOTHESIS`. Its output is parsed strictly, validated, and turned into a `Hypothesis`. Pass or fail is still decided by the experiment engine reading the bus. With AI off (the default), the hand-authored `FallbackHypotheses` table drives the same loop.
-6. **Designs belong to the village.** `DesignRegistry` sits on `VillageState`, so a design survives its inventor's death. Personal understanding stays on citizens and can be lost.
-7. **Saves are versioned.** Every persisted root carries `schemaVersion` (`EmeraldConstants.SCHEMA_VERSION`). `MigrationRegistry` upgrades step by step and refuses saves from a newer build. An unreadable save is preserved untouched and the simulation pauses rather than overwriting it.
+1. **CitizenRecord is the person; CivVillager is only the body.** Records live in `VillageSavedData` (`data/emerald_villages.dat` in the overworld). The record's `bodyUuid` names its one canonical body.
+   - Unloading keeps that link.
+   - A body with a different UUID is a stale duplicate and is discarded when it joins.
+   - Killing the canonical body marks the record dead; the record is kept.
+2. **The Minecraft server is authoritative for physical facts.** Job routines act through `WorldPort`, and every item transfer is a real container change. Offline results are abstract until the `Materializer` applies them, and reality wins every conflict.
+3. **Facts come only from the ObservationBus.** Server-side adapters write to the bus.
+   - `KnowledgeBook.witness` rejects observations that are not on the bus.
+   - `TESTED_TRUE`/`TESTED_FALSE` need an `ExperimentOutcome`, which requires bus evidence.
+   - A library `Writing` can only be produced from a citizen's own tested knowledge, and it cites the proving observation.
+4. **SmartBrainLib executes body behaviour only.** `WalkToTaskTarget`, `FleeThreat` and `DefendVillage` read what the job layer decided.
+5. **The LLM is proposal-only.** `PROPOSE_HYPOTHESIS` is the single allowed action. Output is parsed strictly and validated, and the deterministic table is always the fallback. AI is off by default.
+6. **Designs and books belong to the village.** Personal understanding stays on citizens and can die with them.
+7. **Saves are versioned.**
+   - `schemaVersion` is on every root, and `MigrationRegistry` upgrades step by step.
+   - Saves from a newer build are refused, and unreadable saves are preserved untouched.
+   - A committed golden schema-1 save (`simulation-core/src/test/resources/golden/`) must keep loading.
 
-## Layers
+## The loop
 
 ```
-Minecraft world ──events──▶ ObservationAdapter ──▶ ObservationBus ──▶ ExperimentEngine / KnowledgeBook (witness)
-      ▲                                                  │
-      │ WorldPort (real block/inventory changes)         ▼
-Job routines ◀── CitizenScheduler ◀── UtilityScorer   EggWasteDetector / VillageDirector ──▶ ProblemBoard
-      │                                                                     │
-      ▼                                                                     ▼
-CivVillager body (SmartBrainLib: look, move, wander, flee)        HypothesisSource (table or validated AI)
+problem (predicate over state + bus) -> hypothesis (table or validated AI) -> experiment (real apparatus via requests)
+  -> PASS / FAIL / ABORT from bus evidence (all kept) -> concept TESTED_* on the researcher
+  -> design revision on the village -> builder installs it (no understanding needed)
+  -> still wasting? engineering prototype (Mk N) -> field trial from bus evidence -> adopt or reject
+  -> books (cite evidence) / teaching (OBSERVED only) / study (documented state) / death (lost unless written or adopted)
 ```
 
-- **Utility** (`utility/`): scores EAT, SLEEP, WORK and FLEE from hunger, energy, threat, night, role and caution. It runs every `utilityIntervalTicks`, never every tick.
-- **Jobs** (`job/`): fixed, deterministic routines (`FarmerRoutine`, `CourierRoutine`, `BuilderRoutine`, `ExperimentSetupRoutine`, `WatchExperimentRoutine`, `EatRoutine`, `SleepRoutine`). They hold transient state only and are re-chosen after a reload. There is no GOAP yet.
-- **Requests** (`request/`): OPEN → CLAIMED → DELIVERED, plus BLOCKED and CANCELLED. The v1 resolver chain is: requester already holds it → cancel; warehouse has unreserved stock → stays claimable; otherwise → blocked. A claim reserves stock. There is no recursive crafting.
-- **Construction** (`construction/`): `Blueprint` (from `data/emerald/structure/hut.nbt` when present, else the built-in 5x5 hut), a per-step world diff, material requests in chunks, and one real item consumed per block placed.
-- **Science** (`research/`, `knowledge/`, `technology/`, `education/`): EGGS_WASTED → fallback (or AI) hypothesis → researcher requests a real hopper and places it under the pen → an egg spawning in the pen counts as an opportunity → a `HOPPER_PULLED` caused by that egg means PASS, and the window closing after an opportunity means FAIL. Both results are kept, and a pass creates chicken_collector Mk I on the village.
-- **Ledger** (`event/`): an append-only, bounded record of important events with causation, correlation and provenance.
+## Systems
+
+| Package | What it does |
+|---|---|
+| `utility` | Scores EAT, SLEEP, WORK and FLEE every `utilityIntervalTicks`. Children study by day; for guards under threat, defending is their work. |
+| `job` | Fixed deterministic routines: farmer, courier, builder, experiment setup and watch, teach, write book, study, patrol, defend, eat, sleep. `NOTHING` means "no work" and triggers a short idle back-off, so idle jobs don't rescan the world. Finished routines grant skill XP and feed procedure metrics. |
+| `request` | OPEN → CLAIMED → DELIVERED, plus BLOCKED and CANCELLED. The resolver order is: already held → in stock (a claim reserves it) → blocked. There is no recursive crafting. |
+| `construction` | Blueprints come from `.nbt` or code (5×5 hut, collector Mk I, generated full-floor collector). Each step re-diffs against the world; builders dig soft natural blocks and consume one real item per block. |
+| `observe`, `event` | A bounded observation bus with causation, and an append-only bounded ledger with provenance. |
+| `knowledge`, `education` | Closed concept catalogue and state rules. Teaching gives at most OBSERVED; reading a book gives the documented state. |
+| `research` | EGGS_WASTED detector, experiments (setup → running → pass/fail/abort), problem board. |
+| `technology` | Design revisions (prototype → adopted or failed), procedure metrics, capabilities derived from living knowledge, books and designs. |
+| `director` | Slow strategy, every `directorIntervalTicks`. It opens and resolves FOOD_LOW and HOMELESS, and finds a building site to start huts. It moves a general to the farm during FOOD_LOW (only if there is farmland). It deploys adopted designs, builds and trials prototypes, hands problems to researchers, and admits newcomers (spare beds, food at 2× reserve, cooldown, population cap, role from demand and village bias). |
+| `simulation` | Offline LOD in deterministic steps (seeded by village id and step). Rates come only from what was measured while loaded: counted crop plots, measured collector output, counted stock. Output is pending deltas and queued blocks, which the `Materializer` reconciles on load. |
+| `economy` | Production and consumption totals, daily net, measured production rates. |
+| `sandbox` | `SandboxWorld` (a fake server) and `FirstSliceScenario` (end-to-end proofs). |
 
 ## Module boundaries
 
-`simulation-core` and `ai` import no Minecraft or NeoForge classes; the build enforces this because both compile without Minecraft on the classpath. The NeoForge module converts at the edges: `Positions` (BlockPos ↔ Pos), `NbtBridge` (CompoundTag ↔ neutral maps), `ContainerItemStore` (Container ↔ ItemStore), `MinecraftWorldPort` and `CivBodyPort`.
+`simulation-core` and `ai` import no Minecraft or NeoForge classes; the build enforces this because both compile without Minecraft. The NeoForge module adapts at the edges:
+- `Positions` (BlockPos ↔ Pos)
+- `NbtBridge` (CompoundTag ↔ neutral maps)
+- `ContainerItemStore` (Container ↔ ItemStore)
+- `MinecraftWorldPort`
+- `CivBodyPort`
+- `ObservationAdapter`
+
+## Server ticking
+
+| Every | What |
+|---|---|
+| 10 ticks | Each loaded citizen with a body: threat sensing, scheduler step, body instructions |
+| 20 ticks | Each active village: storage polling, request resolution, experiment timeouts, materialisation, director (at its own cadence), newcomer bodies |
+| 200 ticks | Each inactive village: offline simulation |
+
+A village is *active* while its centre is loaded and either a player is within 128 blocks or the chunk is force-loaded.
 
 ## Known gaps (deliberate, for later milestones)
 
 - REDSTONE_SIGNAL and item movement on water are not observed yet, so WATER_PUSHES_ITEM cannot be witnessed.
-- The warehouse is a single container block. A double chest only exposes the clicked half.
-- Unloaded citizens do not drift needs or progress work. Offline simulation is M9.
-- Builders do not yet place an adopted design (proof 11). That needs `hopper_pen.nbt`.
+- The warehouse is one container block; a double chest exposes only the registered half.
+- No crafting: a shortage stays BLOCKED until someone (a player) stocks the warehouse.
+- One village per world is driven by the commands. The data model already holds several.
+- Families, government, trade and war are out of scope for the first slice, per the spec.

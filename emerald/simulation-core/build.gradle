@@ -14,3 +14,10 @@ tasks.register('sandbox', JavaExec) {
     mainClass = 'dev.emerald.core.sandbox.SandboxMain'
     args = [project.findProperty('seed') ?: '7', "${buildDir}/sandbox-report.md"]
 }
+
+tasks.register('benchmark', JavaExec) {
+    group = 'emerald'
+    description = 'Measures simulation-layer cost for 10..250 citizens'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'dev.emerald.core.sandbox.BenchmarkMain'
+}

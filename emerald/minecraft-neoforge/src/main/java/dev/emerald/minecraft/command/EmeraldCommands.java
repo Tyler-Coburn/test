@@ -197,6 +197,8 @@ public final class EmeraldCommands {
                     + " activeRequests=" + v.requests().active().size()
                     + " observations=" + v.observations().size() + "/" + v.observations().totalRecorded()
                     + " ledger=" + v.ledger().size());
+            say(ctx, "bias=" + v.bias() + " capabilities=" + dev.emerald.core.technology.Capabilities.of(v)
+                    + " books=" + v.library().all().size() + (v.loaded() ? "" : " [running offline]"));
             EmeraldServer.levelOf(v).map(l -> new MinecraftWorldPort(l, v).warehouse())
                     .ifPresent(store -> say(ctx, "warehouse stock: " + store.contents()));
             v.construction().projects().forEach(p -> say(ctx, "project " + p.blueprintId() + " @" + p.origin()

@@ -198,10 +198,20 @@ public final class EmeraldServer {
                 .findFirst());
     }
 
-    /** True while the village centre is loaded and entity-ticking (players nearby). */
+    /** Range within which a player keeps a village physically simulated. */
+    public static final double ACTIVE_RANGE = 128.0;
+
+    /**
+     * Physically simulated while the centre is loaded and either a player is near or the chunk is
+     * force-loaded (/forceload, GameTests). Otherwise the village runs statistically.
+     */
     public static boolean isActive(ServerLevel level, VillageState v) {
         BlockPos c = Positions.toBlockPos(v.center());
-        return level.isLoaded(c) && level.isPositionEntityTicking(c);
+        if (!level.isLoaded(c)) {
+            return false;
+        }
+        boolean forced = level.getForcedChunks().contains(net.minecraft.world.level.ChunkPos.asLong(c));
+        return forced || level.hasNearbyAlivePlayer(c.getX() + 0.5, c.getY(), c.getZ() + 0.5, ACTIVE_RANGE);
     }
 
     /** Spawns a body for a citizen and lets the join handler bind it. */
