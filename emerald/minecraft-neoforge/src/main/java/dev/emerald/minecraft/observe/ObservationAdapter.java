@@ -102,8 +102,12 @@ public final class ObservationAdapter {
         VillageState v = village.get();
         WorldObservation pull = v.observations().record(ObservationType.HOPPER_PULLED, dim(level),
                 Positions.toPos(hopper), ItemIds.EGG, witness(level, v, hopper), level.getGameTime(), spawnObs);
-        Direction facing = level.getBlockState(hopper).getValue(HopperBlock.FACING);
-        BlockPos target = hopper.relative(facing);
+        // Follow the hopper chain (each hopper pushes toward its facing) to the final container.
+        BlockPos target = hopper.relative(level.getBlockState(hopper).getValue(HopperBlock.FACING));
+        for (int hops = 0; hops < 9 && level.getBlockState(target).getBlock() instanceof HopperBlock; hops++) {
+            Direction next = level.getBlockState(target).getValue(HopperBlock.FACING);
+            target = target.relative(next);
+        }
         ContainerItemStore targetStore = MinecraftWorldPort.containerAt(level, target);
         if (targetStore != null) {
             PENDING_STORES.add(new PendingStore(v.id(), target, targetStore.count(ItemIds.EGG), pull.id(),

@@ -12,6 +12,7 @@ sourceSets.main.java.srcDirs += [
         "${rootDir}/simulation-core/src/main/java",
         "${rootDir}/ai/src/main/java"
 ]
+sourceSets.main.java.exclude 'dev/emerald/core/sandbox/**'
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 neoForge {

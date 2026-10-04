@@ -60,6 +60,7 @@ public class CivVillager extends PathfinderMob implements SmartBrainOwner<CivVil
         return Mob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.5)
+                .add(Attributes.ATTACK_DAMAGE, 3.0)
                 .add(Attributes.FOLLOW_RANGE, 48.0);
     }
 
@@ -138,7 +139,21 @@ public class CivVillager extends PathfinderMob implements SmartBrainOwner<CivVil
 
     /** True if wandering is allowed (no job is steering the body). */
     public boolean mayWander() {
-        return walkGoal == null && !fleeing && (task == TaskType.IDLE || task == TaskType.PATROL);
+        return walkGoal == null && !fleeing && task == TaskType.IDLE;
+    }
+
+    /** Nearest living monster within {@code range} blocks, or null. */
+    public Monster nearestMonster(double range) {
+        Monster best = null;
+        double bestDist = range * range;
+        for (Monster m : level().getEntitiesOfClass(Monster.class, getBoundingBox().inflate(range))) {
+            double d = distanceToSqr(m);
+            if (m.isAlive() && d < bestDist) {
+                best = m;
+                bestDist = d;
+            }
+        }
+        return best;
     }
 
     /** Server-observed threat check: a monster within 8 blocks, or hurt by a mob in the last 5 seconds. */
@@ -184,6 +199,7 @@ public class CivVillager extends PathfinderMob implements SmartBrainOwner<CivVil
     public BrainActivityGroup<? extends CivVillager> getIdleTasks() {
         return BrainActivityGroup.idleTasks(
                 new FirstApplicableBehaviour<CivVillager>(
+                        new DefendVillage(),
                         new FleeThreat(),
                         new WalkToTaskTarget(),
                         new OneRandomBehaviour<CivVillager>(

@@ -21,8 +21,6 @@ import dev.emerald.core.village.VillageState;
 import dev.emerald.core.village.VillageWorld;
 import dev.emerald.core.world.Box;
 import dev.emerald.core.world.ItemIds;
-import dev.emerald.minecraft.entity.CivVillager;
-import dev.emerald.minecraft.registry.EmeraldEntities;
 import dev.emerald.minecraft.server.EmeraldServer;
 import dev.emerald.minecraft.world.MinecraftWorldPort;
 import dev.emerald.minecraft.world.Positions;
@@ -68,6 +66,16 @@ public final class EmeraldCommands {
                         .then(Commands.argument("citizen", StringArgumentType.word())
                                 .executes(ctx -> knowledge(ctx, StringArgumentType.getString(ctx, "citizen")))))
                 .then(Commands.literal("problems").executes(EmeraldCommands::problems))
+                .then(Commands.literal("plan")
+                        .executes(ctx -> plan(ctx, null))
+                        .then(Commands.argument("citizen", StringArgumentType.word())
+                                .executes(ctx -> plan(ctx, StringArgumentType.getString(ctx, "citizen")))))
+                .then(Commands.literal("library")
+                        .executes(EmeraldCommands::library)
+                        .then(Commands.argument("pos", BlockPosArgument.blockPos()).executes(EmeraldCommands::setLibrary)))
+                .then(Commands.literal("skills").executes(EmeraldCommands::skills))
+                .then(Commands.literal("economy").executes(EmeraldCommands::economy))
+                .then(Commands.literal("offline").executes(EmeraldCommands::offline))
                 .then(Commands.literal("experiment").executes(EmeraldCommands::experiments))
                 .then(Commands.literal("design").executes(EmeraldCommands::designs))
                 .then(Commands.literal("ledger").executes(EmeraldCommands::ledger))
@@ -135,7 +143,10 @@ public final class EmeraldCommands {
     }
 
     private static int summonMissingBodies(CommandContext<CommandSourceStack> ctx) {
-        return withVillage(ctx, v -> summonMissing(ctx, v));
+        return withVillage(ctx, v -> {
+            EmeraldServer.forgetMissingBodies(v);
+            return summonMissing(ctx, v);
+        });
     }
 
     private static int summonMissing(CommandContext<CommandSourceStack> ctx, VillageState v) {
@@ -148,14 +159,8 @@ public final class EmeraldCommands {
             if (EmeraldServer.body(c.id()).isPresent()) {
                 continue;
             }
-            CivVillager body = EmeraldEntities.CIV_VILLAGER.get().create(level);
-            if (body == null) {
-                continue;
-            }
-            body.setCitizenId(c.id());
-            body.moveTo(at.getX() + 0.5 + (i % 3) - 1, at.getY(), at.getZ() + 0.5 + (i / 3) - 1, 0f, 0f);
-            body.setCustomName(Component.literal(c.name() + " (" + c.role().name().toLowerCase(Locale.ROOT) + ")"));
-            if (level.addFreshEntity(body)) {
+            BlockPos spot = at.offset((i % 3) - 1, 0, (i / 3) - 1);
+            if (EmeraldServer.summonBody(level, c, spot).isPresent()) {
                 summoned++;
             }
         }
@@ -335,6 +340,76 @@ public final class EmeraldCommands {
             List<LedgerEvent> recent = v.ledger().recent(15);
             recent.forEach(e -> say(ctx, e.summary()));
             return recent.size();
+        });
+    }
+
+    private static int plan(CommandContext<CommandSourceStack> ctx, String query) {
+        return withVillage(ctx, v -> {
+            List<CitizenRecord> list = query == null ? v.citizens().alive()
+                    : citizen(ctx, v, query).map(List::of).orElse(List.of());
+            boolean night = EmeraldServer.levelOf(v).map(l -> new MinecraftWorldPort(l, v).isNight()).orElse(false);
+            for (CitizenRecord c : list) {
+                boolean threatened = EmeraldServer.body(c.id()).map(b -> b.nearestMonster(8) != null).orElse(false);
+                var scores = dev.emerald.core.utility.UtilityScorer.score(new dev.emerald.core.utility.UtilityInputs(
+                        c.hunger(), c.energy(), threatened, night, c.effectiveRole(), c.caution()));
+                String routine = EmeraldServer.scheduler().current(c.id())
+                        .map(r -> r.getClass().getSimpleName() + ": " + r.describe()).orElse("none");
+                say(ctx, c.name() + " job=" + c.effectiveRole() + (c.jobOverride() != null ? " (assigned)" : "")
+                        + " scores=" + scores + " -> " + c.currentNeed() + " routine=" + routine);
+            }
+            return list.size();
+        });
+    }
+
+    private static int library(CommandContext<CommandSourceStack> ctx) {
+        return withVillage(ctx, v -> {
+            say(ctx, "Library at " + v.libraryPos() + ": " + v.library().all().size() + " writing(s)");
+            v.library().all().forEach(w -> say(ctx, "  " + w.concept() + " " + w.state() + " by "
+                    + v.citizens().get(w.author()).map(CitizenRecord::name).orElse("?") + " citing "
+                    + w.sourceObservation().toString().substring(0, 8)));
+            return v.library().all().size();
+        });
+    }
+
+    private static int setLibrary(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        BlockPos pos = BlockPosArgument.getLoadedBlockPos(ctx, "pos");
+        return withVillage(ctx, v -> {
+            v.setLibraryPos(Positions.toPos(pos));
+            say(ctx, "Library registered at " + pos.toShortString() + " (a lectern or bookshelf works well).");
+            return 1;
+        });
+    }
+
+    private static int skills(CommandContext<CommandSourceStack> ctx) {
+        return withVillage(ctx, v -> {
+            v.citizens().alive().forEach(c -> say(ctx, c.name() + " " + c.skills()));
+            v.skills().all().forEach(s -> say(ctx, String.format(Locale.ROOT, "  %s: %d/%d ok, avg %d ticks%s",
+                    s.id(), s.successes(), s.attempts(), s.averageTicks(), s.reliable() ? " [reliable]" : "")));
+            return 1;
+        });
+    }
+
+    private static int economy(CommandContext<CommandSourceStack> ctx) {
+        return withVillage(ctx, v -> {
+            long now = ctx.getSource().getLevel().getGameTime();
+            say(ctx, "produced " + v.economy().producedTotals());
+            say(ctx, "consumed " + v.economy().consumedTotals());
+            say(ctx, String.format(Locale.ROOT, "net/day wheat=%.1f bread=%.1f eggs=%.1f; measured egg output %.1f/day",
+                    v.economy().netPerDay(ItemIds.WHEAT, now), v.economy().netPerDay(ItemIds.BREAD, now),
+                    v.economy().netPerDay(ItemIds.EGG, now), v.economy().producedPerDay(ItemIds.EGG)));
+            return 1;
+        });
+    }
+
+    private static int offline(CommandContext<CommandSourceStack> ctx) {
+        return withVillage(ctx, v -> {
+            say(ctx, (v.loaded() ? "loaded" : "UNLOADED") + "; last simulated t=" + v.lastSimulationTime()
+                    + "; snapshot t=" + v.snapshot().takenAt() + " plots=" + v.snapshot().cropPlots()
+                    + " chickens=" + v.snapshot().chickens());
+            say(ctx, "pending deltas " + v.pending().deltas() + "; queued blocks " + v.pending().blocks().size());
+            v.ledger().ofType("OFFLINE_CATCHUP").stream().skip(Math.max(0, v.ledger().ofType("OFFLINE_CATCHUP").size() - 3))
+                    .forEach(e -> say(ctx, "  " + e.summary()));
+            return 1;
         });
     }
 

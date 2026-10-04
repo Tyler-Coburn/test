@@ -75,6 +75,11 @@ public final class VillageWorld {
         return v;
     }
 
+    /** Removes every village (GameTest isolation only). */
+    public void clear() {
+        villages.clear();
+    }
+
     public Map<String, Object> toMap() {
         Map<String, Object> m = Data.map();
         m.put(MigrationRegistry.SCHEMA_KEY, EmeraldConstants.SCHEMA_VERSION);

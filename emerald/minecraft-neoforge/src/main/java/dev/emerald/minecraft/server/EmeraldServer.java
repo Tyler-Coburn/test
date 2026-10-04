@@ -5,6 +5,7 @@ import dev.emerald.ai.AiHypothesisSource;
 import dev.emerald.ai.OllamaProvider;
 import dev.emerald.core.SimulationConfig;
 import dev.emerald.core.citizen.CitizenRecord;
+import dev.emerald.core.citizen.SkillType;
 import dev.emerald.core.construction.BlueprintLibrary;
 import dev.emerald.core.construction.StructureNbtParser;
 import dev.emerald.core.data.DataException;
@@ -22,20 +23,23 @@ import dev.emerald.minecraft.config.EmeraldConfig;
 import dev.emerald.minecraft.entity.CivBodyPort;
 import dev.emerald.minecraft.entity.CivVillager;
 import dev.emerald.minecraft.observe.ObservationAdapter;
+import dev.emerald.minecraft.registry.EmeraldEntities;
 import dev.emerald.minecraft.saved.NbtBridge;
 import dev.emerald.minecraft.saved.VillageSavedData;
 import dev.emerald.minecraft.world.MinecraftWorldPort;
+import dev.emerald.minecraft.world.Positions;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.packs.resources.Resource;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.entity.monster.Monster;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
@@ -48,6 +52,7 @@ import java.io.InputStream;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,12 +60,22 @@ import java.util.UUID;
 /**
  * Server-side coordinator. Owns the loaded VillageWorld, the map of loaded bodies, the job scheduler
  * and the hypothesis sources, and drives them from the server tick:
- * every 10 ticks each loaded citizen steps its job; every 20 ticks each village runs its slow tick.
+ * <ul>
+ *   <li>every 10 ticks, each loaded citizen steps its job;</li>
+ *   <li>every 20 ticks, each loaded village runs its slow tick (requests, experiments, director,
+ *       materialisation of offline results);</li>
+ *   <li>every 200 ticks, each unloaded village advances its statistical offline simulation.</li>
+ * </ul>
+ *
+ * <p>Body rule: a record's {@code bodyUuid} names its one canonical body. Unloading keeps the link;
+ * a body with another UUID is a stale duplicate and is discarded on join. Citizens with no body at
+ * all (newcomers) get one summoned at the village centre while the village is loaded.
  */
 public final class EmeraldServer {
     public static final int VILLAGE_RADIUS = 96;
     private static final int JOB_INTERVAL = 10;
     private static final int VILLAGE_INTERVAL = 20;
+    private static final int OFFLINE_INTERVAL = 200;
 
     private static MinecraftServer server;
     private static VillageSavedData data;
@@ -108,15 +123,14 @@ public final class EmeraldServer {
         }
     }
 
-    /** Loads data/emerald/structure/*.nbt we ship; falls back to the built-in hut if hut.nbt is absent. */
+    /** Ships data/emerald/structure/{hut,chicken_collector}.nbt when present; built-ins otherwise. */
     private static BlueprintLibrary loadBlueprints(MinecraftServer server) {
         BlueprintLibrary lib = BlueprintLibrary.withDefaults();
-        for (String name : new String[]{"hut", "hopper_pen"}) {
+        for (String name : new String[]{"hut", "chicken_collector"}) {
             ResourceLocation file = ResourceLocation.fromNamespaceAndPath("emerald", "structure/" + name + ".nbt");
             Optional<Resource> res = server.getResourceManager().getResource(file);
             if (res.isEmpty()) {
-                EmeraldMod.LOGGER.info("Emerald: {} not found; {}", file,
-                        name.equals("hut") ? "using the built-in fallback hut" : "design blueprint not available yet");
+                EmeraldMod.LOGGER.info("Emerald: {} not found; using the built-in emerald:{} blueprint", file, name);
                 continue;
             }
             try (InputStream in = res.get().open()) {
@@ -130,17 +144,14 @@ public final class EmeraldServer {
         return lib;
     }
 
-    // --- accessors used by commands and adapters -------------------------------------------------
+    // --- accessors used by commands, adapters and GameTests ----------------------------------------
 
     public static Optional<VillageWorld> world() {
         return data == null || data.pausedReason() != null ? Optional.empty() : Optional.of(data.world());
     }
 
     public static String pausedReason() {
-        if (data == null) {
-            return "server not started";
-        }
-        return data.pausedReason();
+        return data == null ? "server not started" : data.pausedReason();
     }
 
     public static void markDirty() {
@@ -151,6 +162,10 @@ public final class EmeraldServer {
 
     public static BlueprintLibrary blueprints() {
         return blueprints;
+    }
+
+    public static CitizenScheduler scheduler() {
+        return SCHEDULER;
     }
 
     public static Optional<CivVillager> body(UUID citizenId) {
@@ -183,6 +198,44 @@ public final class EmeraldServer {
                 .findFirst());
     }
 
+    /** True while the village centre is loaded and entity-ticking (players nearby). */
+    public static boolean isActive(ServerLevel level, VillageState v) {
+        BlockPos c = Positions.toBlockPos(v.center());
+        return level.isLoaded(c) && level.isPositionEntityTicking(c);
+    }
+
+    /** Spawns a body for a citizen and lets the join handler bind it. */
+    public static Optional<CivVillager> summonBody(ServerLevel level, CitizenRecord c, BlockPos at) {
+        CivVillager body = EmeraldEntities.CIV_VILLAGER.get().create(level);
+        if (body == null) {
+            return Optional.empty();
+        }
+        body.setCitizenId(c.id());
+        body.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, level.getRandom().nextFloat() * 360f, 0f);
+        body.setCustomName(Component.literal(c.name() + " (" + c.role().name().toLowerCase(Locale.ROOT) + ")"));
+        return level.addFreshEntity(body) ? Optional.of(body) : Optional.empty();
+    }
+
+    /** Clears the body link of citizens whose body is not loaded, so they can be re-summoned. */
+    public static void forgetMissingBodies(VillageState v) {
+        for (CitizenRecord c : v.citizens().alive()) {
+            if (body(c.id()).isEmpty()) {
+                c.unbindBody();
+            }
+        }
+        markDirty();
+    }
+
+    /** GameTest support: start from an empty civilisation. */
+    public static void resetForTests() {
+        world().ifPresent(VillageWorld::clear);
+        BODIES.values().forEach(b -> b.discard());
+        BODIES.clear();
+        HYPOTHESES.clear();
+        ObservationAdapter.reset();
+        markDirty();
+    }
+
     // --- body binding -------------------------------------------------------------------------
 
     public static void onEntityJoin(EntityJoinLevelEvent event) {
@@ -194,25 +247,21 @@ public final class EmeraldServer {
             return; // save unreadable: never delete bodies we cannot check
         }
         UUID citizenId = body.citizenId();
-        if (citizenId == null) {
-            EmeraldMod.LOGGER.warn("Emerald: discarding a citizen body with no record link at {}", body.blockPosition());
-            event.setCanceled(true);
-            return;
-        }
-        Optional<CitizenRecord> record = world().flatMap(w -> w.citizen(citizenId));
+        Optional<CitizenRecord> record = citizenId == null ? Optional.empty() : world().flatMap(w -> w.citizen(citizenId));
         if (record.isEmpty() || !record.get().alive()) {
-            EmeraldMod.LOGGER.warn("Emerald: discarding body for {} citizen {}", record.isEmpty() ? "unknown" : "dead", citizenId);
+            EmeraldMod.LOGGER.warn("Emerald: discarding body of {} citizen {}",
+                    record.isEmpty() ? "unknown" : "dead", citizenId);
             event.setCanceled(true);
             return;
         }
-        CivVillager existing = BODIES.get(citizenId);
-        if (existing != null && existing != body && existing.isAlive() && !existing.isRemoved()) {
-            EmeraldMod.LOGGER.warn("Emerald: duplicate body for {}; keeping the loaded one", record.get().name());
+        CitizenRecord c = record.get();
+        if (c.bodyUuid() != null && !c.bodyUuid().equals(body.getUUID())) {
+            EmeraldMod.LOGGER.warn("Emerald: discarding stale duplicate body of {}", c.name());
             event.setCanceled(true);
             return;
         }
+        c.bindBody(body.getUUID());
         BODIES.put(citizenId, body);
-        record.get().bindBody(body.getUUID());
         markDirty();
     }
 
@@ -223,23 +272,26 @@ public final class EmeraldServer {
         if (BODIES.get(body.citizenId()) == body) {
             BODIES.remove(body.citizenId());
             SCHEDULER.forget(body.citizenId());
-            world().flatMap(w -> w.citizen(body.citizenId()))
-                    .filter(c -> body.getUUID().equals(c.bodyUuid()))
-                    .ifPresent(CitizenRecord::unbindBody);
-            markDirty();
         }
     }
 
-    /** A body's death is a validated world event: the citizen dies, the record stays. */
+    /** A body's death is a validated world event: the citizen dies, the record stays. Kills train guards. */
     public static void onLivingDeath(LivingDeathEvent event) {
-        if (event.getEntity().level().isClientSide() || !(event.getEntity() instanceof CivVillager body)
-                || body.citizenId() == null) {
+        if (event.getEntity().level().isClientSide()) {
             return;
         }
-        Level level = body.level();
+        if (event.getEntity() instanceof Monster && event.getSource().getEntity() instanceof CivVillager killer
+                && killer.citizenId() != null) {
+            world().flatMap(w -> w.citizen(killer.citizenId())).ifPresent(c -> c.addXp(SkillType.COMBAT, 4));
+            return;
+        }
+        if (!(event.getEntity() instanceof CivVillager body) || body.citizenId() == null) {
+            return;
+        }
+        long time = body.level().getGameTime();
         world().ifPresent(w -> w.villageOf(body.citizenId()).ifPresent(v ->
                 w.citizen(body.citizenId()).ifPresent(c -> {
-                    v.recordDeath(c, event.getSource().getMsgId(), level.getGameTime());
+                    v.recordDeath(c, event.getSource().getMsgId(), time);
                     markDirty();
                 })));
     }
@@ -254,6 +306,7 @@ public final class EmeraldServer {
         long tick = event.getServer().getTickCount();
         boolean jobTick = tick % JOB_INTERVAL == 0;
         boolean villageTick = tick % VILLAGE_INTERVAL == 0;
+        boolean offlineTick = tick % OFFLINE_INTERVAL == 0;
         if (!jobTick && !villageTick) {
             return;
         }
@@ -263,14 +316,20 @@ public final class EmeraldServer {
             if (level.isEmpty()) {
                 continue;
             }
+            if (!isActive(level.get(), v)) {
+                if (offlineTick) {
+                    VillageSimulator.tickUnloaded(v, level.get().getGameTime(), cfg, blueprints);
+                }
+                continue;
+            }
             MinecraftWorldPort port = new MinecraftWorldPort(level.get(), v);
             if (jobTick) {
                 stepCitizens(level.get(), v, port, cfg);
             }
             if (villageTick) {
                 ObservationAdapter.poll(level.get(), v);
-                ItemStore warehouse = port.warehouse();
-                VillageSimulator.tick(v, level.get().getGameTime(), warehouse, cfg, hypothesisSource(v));
+                VillageSimulator.tick(v, port, cfg, hypothesisSource(v), blueprints);
+                summonNewcomers(level.get(), v);
             }
         }
         markDirty();
@@ -284,11 +343,22 @@ public final class EmeraldServer {
             }
             CivVillager e = body.get();
             boolean threatened = e.senseThreat();
-            SCHEDULER.tick(new RoutineContext(v, c, new CivBodyPort(e), port, cfg, blueprints), threatened, level.isNight());
+            SCHEDULER.tick(new RoutineContext(v, c, new CivBodyPort(e), port, cfg, blueprints), threatened, port.isNight());
             e.setFleeing(c.currentNeed() == Need.FLEE);
             e.setTask(c.currentTask());
-            if (c.currentTask() == TaskType.IDLE || c.currentTask() == TaskType.PATROL) {
+            if (c.currentTask() == TaskType.IDLE || c.currentTask() == TaskType.DEFEND) {
                 e.clearWalkGoal();
+            }
+        }
+    }
+
+    /** Newcomers (no body link at all) get a body at the centre while the village is loaded. */
+    private static void summonNewcomers(ServerLevel level, VillageState v) {
+        for (CitizenRecord c : v.citizens().alive()) {
+            if (c.bodyUuid() == null && body(c.id()).isEmpty()) {
+                BlockPos at = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                        Positions.toBlockPos(v.center()));
+                summonBody(level, c, at);
             }
         }
     }

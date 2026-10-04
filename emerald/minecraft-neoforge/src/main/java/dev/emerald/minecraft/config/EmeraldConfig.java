@@ -22,6 +22,17 @@ public final class EmeraldConfig {
     public static final ModConfigSpec.IntValue FARM_RADIUS = BUILDER
             .defineInRange("simulation.farmRadius", SimulationConfig.DEFAULT.farmRadius(), 4, 48);
 
+    public static final ModConfigSpec.IntValue MAX_POPULATION = BUILDER
+            .comment("Newcomers stop arriving at this many living citizens.")
+            .defineInRange("simulation.maxPopulation", SimulationConfig.DEFAULT.maxPopulation(), 6, 200);
+    public static final ModConfigSpec.IntValue IMMIGRATION_COOLDOWN = BUILDER
+            .defineInRange("simulation.immigrationCooldownTicks", SimulationConfig.DEFAULT.immigrationCooldownTicks(), 1200, 720000);
+    public static final ModConfigSpec.IntValue OFFLINE_MAX_DAYS = BUILDER
+            .comment("Longest unloaded period simulated in detail; longer absences skip the rest.")
+            .defineInRange("simulation.offlineMaxDays", 30, 1, 365);
+    public static final ModConfigSpec.IntValue PATROL_RADIUS = BUILDER
+            .defineInRange("simulation.patrolRadius", SimulationConfig.DEFAULT.patrolRadius(), 4, 64);
+
     public static final ModConfigSpec.BooleanValue AI_ENABLED = BUILDER
             .comment("Let a local Ollama model propose hypotheses. The deterministic table is always the fallback.")
             .define("ai.enabled", false);
@@ -43,7 +54,9 @@ public final class EmeraldConfig {
         }
         SimulationConfig d = SimulationConfig.DEFAULT;
         return new SimulationConfig(UTILITY_INTERVAL.get(), EGG_WINDOW.get(), EXPERIMENT_TIMEOUT.get(),
-                d.observationCap(), d.ledgerCap(), FARM_RADIUS.get(), d.plankRequestCount());
+                d.observationCap(), d.ledgerCap(), FARM_RADIUS.get(), d.plankRequestCount(),
+                d.directorIntervalTicks(), MAX_POPULATION.get(), IMMIGRATION_COOLDOWN.get(), d.offlineStepTicks(),
+                OFFLINE_MAX_DAYS.get() * 24000L, PATROL_RADIUS.get());
     }
 
     public static AiConfig ai() {
