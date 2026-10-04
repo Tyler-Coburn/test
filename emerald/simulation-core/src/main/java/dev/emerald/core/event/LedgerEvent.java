@@ -30,7 +30,7 @@ public record LedgerEvent(
         Map<String, String> payload
 ) {
     public LedgerEvent {
-        payload = Map.copyOf(payload);
+        payload = java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(payload));
     }
 
     public String summary() {

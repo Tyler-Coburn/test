@@ -18,4 +18,9 @@ public enum ProblemType {
     public boolean researchable() {
         return researchable;
     }
+
+    /** The concept a researcher must have witnessed before hypothesising about this problem, or null. */
+    public dev.emerald.core.knowledge.ConceptId groundingConcept() {
+        return this == EGGS_WASTED ? dev.emerald.core.knowledge.ConceptId.CHICKEN_LAYING : null;
+    }
 }

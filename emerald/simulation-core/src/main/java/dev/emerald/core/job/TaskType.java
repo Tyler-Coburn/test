@@ -15,5 +15,6 @@ public enum TaskType {
     DEFEND,
     TEACH,
     WRITE_BOOK,
-    STUDY
+    STUDY,
+    INVESTIGATE
 }

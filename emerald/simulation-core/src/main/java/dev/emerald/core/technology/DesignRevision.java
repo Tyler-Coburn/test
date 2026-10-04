@@ -29,7 +29,7 @@ public record DesignRevision(
         long createdAt
 ) {
     public DesignRevision {
-        cost = Map.copyOf(cost);
+        cost = java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(cost));
         requires = List.copyOf(requires);
     }
 

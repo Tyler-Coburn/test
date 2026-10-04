@@ -14,7 +14,7 @@ import java.util.Map;
  */
 public record BlueprintBlock(Pos rel, String blockId, Map<String, String> properties, String itemId) {
     public BlueprintBlock {
-        properties = Map.copyOf(properties);
+        properties = java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(properties));
     }
 
     public static BlueprintBlock simple(Pos rel, String blockId) {

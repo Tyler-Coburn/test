@@ -6,6 +6,7 @@ import dev.emerald.core.construction.ConstructionProject;
 import dev.emerald.core.education.Library;
 import dev.emerald.core.education.Writing;
 import dev.emerald.core.event.Provenance;
+import dev.emerald.core.knowledge.ConceptId;
 import dev.emerald.core.knowledge.KnowState;
 import dev.emerald.core.knowledge.KnowledgeEntry;
 import dev.emerald.core.request.ResourceRequest;
@@ -167,6 +168,13 @@ public final class CitizenScheduler {
                 return e.phase() == Experiment.Phase.SETUP
                         ? new ExperimentSetupRoutine(e.id())
                         : new WatchExperimentRoutine(e.id());
+            }
+        }
+        for (var problem : v.problems().all()) {
+            ConceptId grounding = problem.type().groundingConcept();
+            if (problem.isActive() && problem.type().researchable() && grounding != null
+                    && me.knowledge().state(grounding) == KnowState.UNKNOWN && v.pen() != null) {
+                return new InvestigateRoutine(grounding);
             }
         }
         for (KnowledgeEntry e : me.knowledge().entries()) {

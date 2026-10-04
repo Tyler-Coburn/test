@@ -307,6 +307,10 @@ public final class VillageDirector {
         if (problem.isEmpty() || researcher.isEmpty()) {
             return;
         }
+        var grounding = problem.get().type().groundingConcept();
+        if (grounding != null && researcher.get().knowledge().state(grounding) == dev.emerald.core.knowledge.KnowState.UNKNOWN) {
+            return;   // the researcher investigates first (see InvestigateRoutine)
+        }
         Optional<Hypothesis> h = hypotheses.next(v, problem.get(), researcher.get(), now);
         if (h.isPresent()) {
             ExperimentEngine.propose(v, h.get(), researcher.get(), apparatusFor(v.pen()), now);
