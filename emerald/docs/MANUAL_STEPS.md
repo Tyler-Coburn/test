@@ -34,7 +34,7 @@ Built-in blueprints exist for everything, so these are optional.
 ## 2. Automated checks
 
 ```bash
-./gradlew -Pemerald.coreOnly=true test                     # 81 tests incl. 5-seed end-to-end scenario + golden save
+./gradlew -Pemerald.coreOnly=true test                     # 83 tests incl. 5-seed end-to-end scenario + golden save
 ./gradlew -Pemerald.coreOnly=true :simulation-core:sandbox  # narrative report: simulation-core/build/sandbox-report.md
 ./gradlew runGameTestServer                                 # 11 in-game GameTests (needs the NeoForge build)
 ```

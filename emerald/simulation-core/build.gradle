@@ -21,3 +21,11 @@ tasks.register('benchmark', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'dev.emerald.core.sandbox.BenchmarkMain'
 }
+
+tasks.register('replay', JavaExec) {
+    group = 'emerald'
+    description = 'Records a scenario run as build/replay.json for tools/replay-viewer.html'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'dev.emerald.core.sandbox.ReplayMain'
+    args = [project.findProperty('seed') ?: '7', "${buildDir}/replay.json"]
+}

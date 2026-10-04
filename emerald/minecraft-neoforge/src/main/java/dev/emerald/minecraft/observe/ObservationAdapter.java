@@ -22,6 +22,7 @@ import net.minecraft.world.level.block.HopperBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.level.PistonEvent;
 import net.neoforged.neoforge.event.level.block.CropGrowEvent;
 
@@ -38,13 +39,16 @@ import java.util.UUID;
  * facts. Causation is tracked: egg spawn -> hopper pull (causedBy egg) -> stored in the container the
  * hopper feeds (causedBy pull).
  *
- * <p>Not yet observed: REDSTONE_SIGNAL (no cheap event) and item movement on water.
+ * <p>Not yet observed: item movement on water.
  */
 public final class ObservationAdapter {
     /** Live egg item entities we saw spawn, mapped to their ITEM_SPAWNED observation. */
     private static final Map<UUID, UUID> TRACKED_EGGS = new HashMap<>();
     /** Hopper pulls waiting to see the egg arrive in the container below/beside the hopper. */
     private static final List<PendingStore> PENDING_STORES = new ArrayList<>();
+    /** Last REDSTONE_SIGNAL observation per block position, so clocks cannot flood the bounded bus. */
+    private static final Map<Long, Long> LAST_SIGNAL = new HashMap<>();
+    private static final int SIGNAL_COOLDOWN_TICKS = 200;
 
     private record PendingStore(UUID villageId, BlockPos target, int baseline, UUID pullObservation, long expiresAt) {
     }
@@ -55,6 +59,7 @@ public final class ObservationAdapter {
     public static void reset() {
         TRACKED_EGGS.clear();
         PENDING_STORES.clear();
+        LAST_SIGNAL.clear();
     }
 
     public static void onEntityJoin(EntityJoinLevelEvent event) {
@@ -154,6 +159,31 @@ public final class ObservationAdapter {
         EmeraldServer.villageAt(level, event.getPos()).ifPresent(v -> v.observations().record(
                 ObservationType.PISTON_MOVED, dim(level), Positions.toPos(event.getPos()), null,
                 witness(level, v, event.getPos()), level.getGameTime(), null));
+    }
+
+    /**
+     * A signal source (lever, button, observer, redstone wire, torch...) updated its neighbours inside
+     * a village: one REDSTONE_SIGNAL per position per cooldown.
+     */
+    public static void onNeighborNotify(BlockEvent.NeighborNotifyEvent event) {
+        if (!(event.getLevel() instanceof ServerLevel level) || !event.getState().isSignalSource()) {
+            return;
+        }
+        BlockPos pos = event.getPos();
+        long now = level.getGameTime();
+        Long last = LAST_SIGNAL.get(pos.asLong());
+        if (last != null && now - last < SIGNAL_COOLDOWN_TICKS) {
+            return;
+        }
+        EmeraldServer.villageAt(level, pos).ifPresent(v -> {
+            LAST_SIGNAL.put(pos.asLong(), now);
+            if (LAST_SIGNAL.size() > 4096) {
+                LAST_SIGNAL.clear();
+            }
+            v.observations().record(ObservationType.REDSTONE_SIGNAL, dim(level), Positions.toPos(pos),
+                    net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(event.getState().getBlock()).toString(),
+                    witness(level, v, pos), now, null);
+        });
     }
 
     /** Nearest living citizen body within 16 blocks, if any. */

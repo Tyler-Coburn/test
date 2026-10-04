@@ -19,10 +19,11 @@ The mod jar compiles the pure modules' sources into itself. The sandbox package 
 ## Try it without Minecraft
 
 ```bash
-./gradlew -Pemerald.coreOnly=true test                     # 81 unit/scenario tests
+./gradlew -Pemerald.coreOnly=true test                     # 83 unit/scenario tests
 ./gradlew -Pemerald.coreOnly=true :simulation-core:sandbox  # whole first slice end to end -> simulation-core/build/sandbox-report.md
 ./gradlew -Pemerald.coreOnly=true :simulation-core:sandbox -Pseed=42
 ./gradlew -Pemerald.coreOnly=true :simulation-core:benchmark
+./gradlew -Pemerald.coreOnly=true :simulation-core:replay && python3 tools/build_replay_page.py   # build/emerald-replay.html: watch a run
 ```
 
 The sandbox stands in for the server. It has a flat world with growing wheat, laying chickens, real hopper and chest mechanics, monsters, and walking bodies. In it, a village founds itself, farms, shares a chest, builds huts, notices wasted eggs, fails and then passes a hopper experiment, writes the result down and teaches it, and installs and then improves a chicken collector. It also survives three unloaded days, a night attack, a save/reload, and the inventor's death. The run reports 18 checks.

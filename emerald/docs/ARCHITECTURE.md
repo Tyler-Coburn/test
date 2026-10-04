@@ -68,7 +68,7 @@ A village is *active* while its centre is loaded and either a player is within 1
 
 ## Known gaps (deliberate, for later milestones)
 
-- REDSTONE_SIGNAL and item movement on water are not observed yet, so WATER_PUSHES_ITEM cannot be witnessed.
+- Item movement on water is not observed yet, so WATER_PUSHES_ITEM cannot be witnessed. REDSTONE_SIGNAL is observed from signal-source block updates (rate-limited per position).
 - The warehouse is one container block; a double chest exposes only the registered half.
 - No crafting: a shortage stays BLOCKED until someone (a player) stocks the warehouse.
 - One village per world is driven by the commands. The data model already holds several.

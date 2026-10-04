@@ -63,6 +63,8 @@ public final class SandboxWorld implements WorldPort {
     /** Chickens may only lay in these pen cells when non-null (lets a scenario keep them off the hopper). */
     public List<Pos> layingCells;
     private boolean loaded = true;
+    /** Called after every step (replay recording, scenario probes). */
+    public final List<java.util.function.Consumer<SandboxWorld>> stepListeners = new ArrayList<>();
     private final Random rng;
     public int looseEggs;
 
@@ -146,6 +148,13 @@ public final class SandboxWorld implements WorldPort {
     // ---- simulation step -------------------------------------------------------------------
 
     public void step() {
+        stepOnce();
+        for (var l : stepListeners) {
+            l.accept(this);
+        }
+    }
+
+    private void stepOnce() {
         time += STEP_TICKS;
         if (!loaded) {
             if (time % 200 == 0) {

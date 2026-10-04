@@ -38,6 +38,7 @@ public final class EmeraldMod {
         NeoForge.EVENT_BUS.addListener(ObservationAdapter::onEntityLeave);
         NeoForge.EVENT_BUS.addListener(ObservationAdapter::onCropGrow);
         NeoForge.EVENT_BUS.addListener(ObservationAdapter::onPistonMoved);
+        NeoForge.EVENT_BUS.addListener(ObservationAdapter::onNeighborNotify);
 
         LOGGER.info("Emerald loaded (schema v{})", EmeraldConstants.SCHEMA_VERSION);
     }

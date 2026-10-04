@@ -56,14 +56,25 @@ public final class FirstSliceScenario {
     private VillageState v;
     private VillageWorld world;
 
+    private java.util.function.Consumer<SandboxWorld> recorder;
+
     public FirstSliceScenario(long seed) {
         this.seed = seed;
+    }
+
+    /** Observe every sandbox step (e.g. a {@link ReplayRecorder}). */
+    public FirstSliceScenario withRecorder(java.util.function.Consumer<SandboxWorld> recorder) {
+        this.recorder = recorder;
+        return this;
     }
 
     public Result run() {
         SimulationConfig cfg = SimulationConfig.DEFAULT;
         world = new VillageWorld(cfg);
         w = new SandboxWorld(seed, 1000, 64, cfg);
+        if (recorder != null) {
+            w.stepListeners.add(recorder);
+        }
         Pos center = new Pos(0, 64, 0);
         v = world.found("Sandbox Hollow", SandboxWorld.DIM, center, w.time, seed);
         w.bind(v);

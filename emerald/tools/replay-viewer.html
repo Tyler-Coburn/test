@@ -1,0 +1,325 @@
+<title>Emerald Village Replay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: survey map on the left (the village from above), ledger + roster on the right, proofs underneath. */
+:root {
+  --ground: #eef1ea;      /* page */
+  --sheet: #f8faf5;       /* panels */
+  --ink: #1d2a22;         /* text */
+  --muted: #5d6b61;       /* secondary text */
+  --rule: #d3dbd0;        /* hairlines */
+  --emerald: #13865a;     /* accent */
+  --emerald-soft: #d5ecdf;
+  --grass: #cfe0c2;       /* map ground */
+  --night: rgba(16, 28, 48, 0.42);
+  --pass: #13865a;
+  --fail: #b3402e;
+  --warn: #a8761b;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #111814; --sheet: #172019; --ink: #e3eadf; --muted: #9aa99d; --rule: #2b372f;
+    --emerald: #3cc48b; --emerald-soft: #1d3a2c; --grass: #26372a; --night: rgba(4, 8, 20, 0.5);
+    --pass: #3cc48b; --fail: #e2735f; --warn: #d6a54a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #111814; --sheet: #172019; --ink: #e3eadf; --muted: #9aa99d; --rule: #2b372f;
+  --emerald: #3cc48b; --emerald-soft: #1d3a2c; --grass: #26372a; --night: rgba(4, 8, 20, 0.5);
+  --pass: #3cc48b; --fail: #e2735f; --warn: #d6a54a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.5 var(--font-body); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 40px; display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+h1 { font: 700 clamp(1.6rem, 3.4vw, 2.3rem)/1.1 var(--font-display); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h1 span { color: var(--emerald); }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 62ch; }
+.meta { font: 13px var(--font-data); color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; min-width: 0; }
+h2 { font: 600 0.78rem var(--font-body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px; }
+.mapbox { position: relative; }
+canvas { display: block; width: 100%; height: auto; border-radius: 6px; background: var(--grass); image-rendering: pixelated; }
+.clock { position: absolute; top: 10px; left: 10px; font: 500 13px var(--font-data); background: var(--sheet); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: 6px; padding: 3px 8px; font-variant-numeric: tabular-nums; }
+.unloaded { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 16px;
+  background: color-mix(in srgb, var(--sheet) 78%, transparent); border-radius: 6px; font: 500 15px var(--font-body); color: var(--ink); }
+.unloaded[hidden] { display: none; }
+.unloaded b { display: block; font: 700 1.2rem var(--font-display); color: var(--emerald); }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+button { font: 500 14px var(--font-body); color: var(--ink); background: var(--ground); border: 1px solid var(--rule);
+  border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--emerald); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--emerald-soft); border-color: var(--emerald); }
+#play { background: var(--emerald); color: var(--sheet); border-color: var(--emerald); min-width: 84px; }
+input[type=range] { flex: 1 1 220px; accent-color: var(--emerald); min-width: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.stock { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.stock div { border: 1px solid var(--rule); border-radius: 6px; padding: 6px 10px; }
+.stock small { display: block; color: var(--muted); font-size: 12px; }
+.stock strong { font: 500 18px var(--font-data); font-variant-numeric: tabular-nums; }
+.side { display: grid; gap: 16px; min-width: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+td, th { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 600 11.5px var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; text-align: right; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+.task { font: 12px var(--font-data); padding: 1px 6px; border-radius: 4px; background: var(--ground); border: 1px solid var(--rule); white-space: nowrap; }
+.task.dead { color: var(--fail); border-color: var(--fail); }
+.feed { max-height: 360px; overflow-y: auto; display: grid; gap: 2px; font-size: 13px; }
+.feed div { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--rule); }
+.feed time { font: 12px var(--font-data); color: var(--muted); font-variant-numeric: tabular-nums; }
+.feed b { font-weight: 600; }
+.feed .k { color: var(--emerald); }
+.feed .bad { color: var(--fail); }
+.feed span { overflow-wrap: anywhere; }
+.proofs { overflow-x: auto; }
+.pill { font: 600 11px var(--font-data); padding: 2px 7px; border-radius: 999px; color: var(--sheet); }
+.pill.ok { background: var(--pass); } .pill.no { background: var(--fail); }
+.proofs td:nth-child(3) { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1><span>Emerald</span> village replay</h1>
+      <p class="sub" id="sub">A recorded headless run of the first playable slice: six citizens, no language model, every fact from the observation bus.</p>
+    </div>
+    <div class="meta" id="meta"></div>
+  </header>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>Village from above</h2>
+      <div class="mapbox">
+        <canvas id="map" width="720" height="720" aria-label="Top-down map of the village"></canvas>
+        <div class="clock" id="clock">Day 0 · 06:00</div>
+        <div class="unloaded" id="unloaded" hidden><div><b>Village unloaded</b>Nobody is nearby. The village keeps living statistically; results are reconciled when it loads again.</div></div>
+      </div>
+      <div class="controls">
+        <button id="play" type="button">Play</button>
+        <input id="scrub" type="range" min="0" value="0" aria-label="Replay position">
+        <div role="group" aria-label="Playback speed">
+          <button type="button" data-speed="1">1×</button>
+          <button type="button" data-speed="4" aria-pressed="true">4×</button>
+          <button type="button" data-speed="12">12×</button>
+        </div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <h2 style="margin-top:16px">Warehouse and collector</h2>
+      <div class="stock" id="stock"></div>
+    </section>
+
+    <div class="side">
+      <section class="panel">
+        <h2>Citizens</h2>
+        <div style="overflow-x:auto"><table id="people"></table></div>
+      </section>
+      <section class="panel">
+        <h2>Village ledger</h2>
+        <div class="feed" id="feed"></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel proofs">
+    <h2>Proof checks for this run</h2>
+    <table id="checks"></table>
+  </section>
+</div>
+
+<script>
+const REPLAY = /*REPLAY_DATA*/null;
+
+const ROLE_COLORS = { FARMER: "#c79a2b", BUILDER: "#9a5b2e", RESEARCHER: "#3f6fd1", GUARD: "#b3402e", GENERAL: "#7a55b8", CHILD: "#d36aa0" };
+const BLOCK_COLORS = { oak_planks: "#b98b55", hopper: "#4b5156", chest: "#c88a2a" };
+const IMPORTANT = new Set(["VILLAGE_FOUNDED","PROBLEM_OPENED","PROBLEM_RESOLVED","HYPOTHESIS_PROPOSED","EXPERIMENT_STARTED","EXPERIMENT_PASSED","EXPERIMENT_FAILED","EXPERIMENT_ABORTED","CONCEPT_TESTED","DESIGN_ADOPTED","DESIGN_INSTALLED","PROTOTYPE_STARTED","PROTOTYPE_FAILED","BOOK_WRITTEN","BOOK_READ","KNOWLEDGE_TAUGHT","BUILDING_COMPLETED","PROJECT_STARTED","CITIZEN_ARRIVED","CITIZEN_DIED","REQUEST_DELIVERED","VILLAGE_UNLOADED","VILLAGE_LOADED","OFFLINE_CATCHUP","JOB_ASSIGNED","TASK_FAILED"]);
+const BAD = new Set(["EXPERIMENT_FAILED","PROTOTYPE_FAILED","CITIZEN_DIED","TASK_FAILED"]);
+
+const $ = id => document.getElementById(id);
+const canvas = $("map"), ctx = canvas.getContext("2d");
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+function clockOf(t) {
+  // Minecraft ticks start at 06:00; roll the displayed day over at midnight.
+  const day = Math.floor((t + 6000) / 24000) + 1, tod = t % 24000;
+  const mins = Math.floor(((tod / 1000 + 6) % 24) * 60);
+  const hh = String(Math.floor(mins / 60)).padStart(2, "0"), mm = String(mins % 60).padStart(2, "0");
+  return { day, text: `Day ${day} · ${hh}:${mm}`, night: tod >= 13000 && tod < 23000 };
+}
+const titleCase = s => s.charAt(0) + s.slice(1).toLowerCase().replaceAll("_", " ");
+
+function init(data) {
+  const frames = data.frames;
+  // Rebuild the block map at every frame from the recorded add/remove diffs.
+  const blockStates = [];
+  let blocks = new Map();
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  const grow = (x, z) => { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z); };
+  grow(data.center[0], data.center[1]);
+  for (const f of frames) {
+    if (f.add || f.del) {
+      blocks = new Map(blocks);
+      for (const [x, y, z] of f.del || []) blocks.delete(`${x},${y},${z}`);
+      for (const [x, y, z, b] of f.add || []) { blocks.set(`${x},${y},${z}`, [x, y, z, b]); grow(x, z); }
+    }
+    blockStates.push(blocks);
+    for (const b of f.bodies) if (b[3] !== "DEAD") grow(b[1], b[2]);
+    for (const c of f.crops) grow(c[0], c[1]);
+  }
+  const pad = 3;
+  minX -= pad; minZ -= pad; maxX += pad; maxZ += pad;
+  const span = Math.max(maxX - minX + 1, maxZ - minZ + 1);
+  const cell = Math.floor(720 / span);
+  const size = cell * span;
+  canvas.width = size; canvas.height = size;
+  const px = x => (x - minX) * cell, pz = z => (z - minZ) * cell;
+
+  $("meta").innerHTML = `<span>seed ${data.seed}</span><span>${data.village}</span><span>bias ${titleCase(data.bias)}</span><span>${frames.length} frames · every ${data.every} ticks</span>`;
+  $("legend").innerHTML = Object.entries(ROLE_COLORS).map(([r, c]) => `<span><i style="background:${c};border-radius:50%"></i>${titleCase(r)}</span>`).join("")
+    + `<span><i style="background:${BLOCK_COLORS.oak_planks}"></i>Planks</span><span><i style="background:${BLOCK_COLORS.hopper}"></i>Hopper</span><span><i style="background:${BLOCK_COLORS.chest}"></i>Chest</span><span><i style="background:#d8b13b"></i>Ripe wheat</span>`;
+
+  const passed = data.checks.filter(c => c[2]).length;
+  $("checks").innerHTML = `<tr><th>Check</th><th>Result</th><th>What was measured</th></tr>` + data.checks.map(([id, desc, ok, detail]) =>
+    `<tr><td><b>${id}</b> ${desc}</td><td><span class="pill ${ok ? "ok" : "no"}">${ok ? "PASS" : "FAIL"}</span></td><td>${escapeHtml(detail)}</td></tr>`).join("");
+  $("sub").textContent = `A recorded headless run of the first playable slice: ${data.people.length} citizens over ${clockOf(frames.at(-1).t).day} in-game days, no language model, every fact from the observation bus. ${passed} of ${data.checks.length} proof checks passed.`;
+
+  // Ledger events accumulated per frame (only the meaningful ones).
+  const eventsUpTo = [];
+  let acc = [];
+  for (const f of frames) {
+    if (f.events) acc = acc.concat(f.events.filter(e => IMPORTANT.has(e[1])));
+    eventsUpTo.push(acc.length);
+  }
+
+  const scrub = $("scrub");
+  scrub.max = frames.length - 1;
+  let i = 0, playing = false, speed = 4, last = 0;
+
+  function draw() {
+    const f = frames[i];
+    const clock = clockOf(f.t);
+    ctx.fillStyle = css("--grass");
+    ctx.fillRect(0, 0, size, size);
+    // faint block grid every 8 blocks
+    ctx.strokeStyle = css("--rule");
+    ctx.lineWidth = 1;
+    for (let g = Math.ceil(minX / 8) * 8; g <= maxX; g += 8) { ctx.beginPath(); ctx.moveTo(px(g), 0); ctx.lineTo(px(g), size); ctx.stroke(); }
+    for (let g = Math.ceil(minZ / 8) * 8; g <= maxZ; g += 8) { ctx.beginPath(); ctx.moveTo(0, pz(g)); ctx.lineTo(size, pz(g)); ctx.stroke(); }
+    // crops: farmland brown, wheat greener to gold with age
+    for (const [x, z, age] of f.crops) {
+      ctx.fillStyle = "#7b5a3a"; ctx.fillRect(px(x), pz(z), cell, cell);
+      const t = age / 7;
+      ctx.fillStyle = age >= 7 ? "#d8b13b" : `rgb(${Math.round(90 + 90 * t)},${Math.round(150 + 20 * t)},${Math.round(60 - 20 * t)})`;
+      ctx.fillRect(px(x) + 1, pz(z) + 1, cell - 2, cell - 2);
+    }
+    // blocks, highest layer wins
+    const top = new Map();
+    for (const b of blockStates[i].values()) {
+      const k = b[0] + "," + b[2];
+      if (!top.has(k) || top.get(k)[1] < b[1]) top.set(k, b);
+    }
+    for (const [x, , z, b] of top.values()) {
+      ctx.fillStyle = BLOCK_COLORS[b] || "#8a8f86";
+      ctx.fillRect(px(x), pz(z), cell, cell);
+      ctx.strokeStyle = "rgba(0,0,0,0.18)"; ctx.strokeRect(px(x) + 0.5, pz(z) + 0.5, cell - 1, cell - 1);
+    }
+    // pen outline and warehouse marker
+    if (data.pen) {
+      const [x0, z0, x1, z1] = data.pen;
+      ctx.setLineDash([4, 3]); ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.5;
+      ctx.strokeRect(px(x0) - 2, pz(z0) - 2, (x1 - x0 + 1) * cell + 4, (z1 - z0 + 1) * cell + 4);
+      ctx.setLineDash([]);
+      label("pen", px(x0), pz(z0) - 6);
+    }
+    if (data.warehouse) label("warehouse", px(data.warehouse[0]), pz(data.warehouse[1]) - 6);
+    // monsters
+    for (const [x, z] of f.monsters) {
+      ctx.strokeStyle = css("--fail"); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(px(x) + 2, pz(z) + 2); ctx.lineTo(px(x) + cell - 2, pz(z) + cell - 2);
+      ctx.moveTo(px(x) + cell - 2, pz(z) + 2); ctx.lineTo(px(x) + 2, pz(z) + cell - 2); ctx.stroke();
+    }
+    // citizens
+    for (const [idx, x, z, task] of f.bodies) {
+      if (task === "DEAD") continue;
+      const p = data.people[idx];
+      const r = Math.max(4, cell * 0.55);
+      ctx.beginPath(); ctx.arc(px(x) + cell / 2, pz(z) + cell / 2, r, 0, Math.PI * 2);
+      ctx.fillStyle = ROLE_COLORS[p.role] || "#555"; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = css("--sheet"); ctx.stroke();
+      ctx.fillStyle = "#fff"; ctx.font = `600 ${Math.max(9, r)}px ${css("--font-body")}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(p.name[0], px(x) + cell / 2, pz(z) + cell / 2 + 0.5);
+    }
+    if (clock.night) { ctx.fillStyle = css("--night"); ctx.fillRect(0, 0, size, size); }
+    $("clock").textContent = clock.text + (clock.night ? " · night" : "");
+    $("unloaded").hidden = f.loaded;
+    renderSide(f);
+    scrub.value = i;
+  }
+
+  function label(text, x, y) {
+    ctx.font = `500 11px ${css("--font-data")}`; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = css("--ink"); ctx.fillText(text, x, Math.max(10, y));
+  }
+
+  function renderSide(f) {
+    $("stock").innerHTML = Object.entries(f.stock).map(([k, v]) => `<div><small>${k.replaceAll("_", " ")}</small><strong>${v}</strong></div>`).join("")
+      + `<div><small>population</small><strong>${f.pop}</strong></div>`;
+    const rows = data.people.map((p, idx) => {
+      const b = f.bodies.find(x => x[0] === idx);
+      if (!b) return `<tr><td><span class="dot" style="background:${ROLE_COLORS[p.role]}"></span>${p.name}</td><td>${titleCase(p.role)}</td><td colspan="3"><span class="task">${f.loaded ? "not yet arrived" : "simulated offline"}</span></td></tr>`;
+      if (b[3] === "DEAD") return `<tr><td><span class="dot" style="background:${ROLE_COLORS[p.role]}"></span>${p.name}</td><td>${titleCase(p.role)}</td><td colspan="3"><span class="task dead">died</span></td></tr>`;
+      return `<tr><td><span class="dot" style="background:${ROLE_COLORS[p.role]}"></span>${p.name}</td><td>${titleCase(p.role)}</td><td><span class="task">${titleCase(b[3])}</span></td><td class="num">${b[4]}</td><td class="num">${b[5]}</td></tr>`;
+    });
+    $("people").innerHTML = `<tr><th>Name</th><th>Role</th><th>Doing</th><th class="num">Hunger</th><th class="num">Energy</th></tr>` + rows.join("");
+    const shown = acc.slice(0, eventsUpTo[i]).slice(-80).reverse();
+    $("feed").innerHTML = shown.length ? shown.map(([t, type, who, what]) =>
+      `<div><time>${clockOf(t).text.replace("Day ", "D").replace(" · ", " ")}</time><span><b class="${BAD.has(type) ? "bad" : "k"}">${titleCase(type)}</b>${who ? " · " + escapeHtml(who) : ""}${what ? " — " + escapeHtml(what) : ""}</span></div>`).join("")
+      : `<div><time></time><span>The ledger fills as the village acts. Press Play.</span></div>`;
+  }
+
+  function tick(ts) {
+    if (playing) {
+      const rate = frames[i].loaded ? speed : speed * 6;   // skim the unloaded stretch
+      if (ts - last > 1000 / (2 * rate)) {
+        last = ts;
+        if (i < frames.length - 1) { i++; draw(); } else { setPlaying(false); }
+      }
+      requestAnimationFrame(tick);
+    }
+  }
+  function setPlaying(v) {
+    playing = v; $("play").textContent = v ? "Pause" : (i >= frames.length - 1 ? "Replay" : "Play");
+    if (v) { if (i >= frames.length - 1) i = 0; requestAnimationFrame(tick); }
+  }
+  $("play").onclick = () => setPlaying(!playing);
+  scrub.oninput = () => { i = +scrub.value; draw(); };
+  document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => {
+    speed = +b.dataset.speed;
+    document.querySelectorAll("[data-speed]").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+  });
+  document.addEventListener("keydown", e => { if (e.code === "Space" && e.target === document.body) { e.preventDefault(); setPlaying(!playing); } });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // Open on an interesting moment: the first passed experiment, else the middle.
+  const firstPass = frames.findIndex(f => (f.events || []).some(e => e[1] === "EXPERIMENT_PASSED"));
+  i = firstPass > 0 ? firstPass : Math.floor(frames.length / 2);
+  draw();
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+if (REPLAY) init(REPLAY);
+else document.querySelector(".wrap").insertAdjacentHTML("beforeend", `<p class="panel">No replay data embedded. Run <code>./gradlew -Pemerald.coreOnly=true :simulation-core:replay</code> then <code>python3 tools/build_replay_page.py</code>.</p>`);
+</script>
