@@ -85,6 +85,8 @@ public final class EmeraldGameTests {
         VillageState v = world.found("Testvale", level.dimension().location().toString(),
                 Positions.toPos(h.absolutePos(new BlockPos(6, 1, 6))), level.getGameTime(), 1L);
         VillageSimulator.wire(v);
+        BlockPos centre = h.absolutePos(new BlockPos(6, 1, 6));
+        level.setChunkForced(centre.getX() >> 4, centre.getZ() >> 4, true);   // keep the village physically active
         for (CitizenRecord c : v.citizens().all()) {
             c.bindBody(UUID.randomUUID());   // placeholder link: these citizens are elsewhere
             c.setHunger(0);

@@ -50,7 +50,9 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collection;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -239,8 +241,9 @@ public final class EmeraldServer {
     /** GameTest support: start from an empty civilisation. */
     public static void resetForTests() {
         world().ifPresent(VillageWorld::clear);
-        BODIES.values().forEach(b -> b.discard());
-        BODIES.clear();
+        List<CivVillager> loaded = new ArrayList<>(BODIES.values());
+        BODIES.clear();   // clear first: discard() fires the leave handler, which edits BODIES
+        loaded.forEach(CivVillager::discard);
         HYPOTHESES.clear();
         ObservationAdapter.reset();
         markDirty();
