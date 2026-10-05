@@ -1,0 +1,75 @@
+# Emerald (emerald/): pure-Java tests, the NeoForge mod build, and in-game GameTests.
+# GitHub-hosted runners can reach maven.neoforged.net, Mojang and the SmartBrainLib maven.
+name: Emerald
+
+on:
+  push:
+    paths:
+      - 'emerald/**'
+      - '.github/workflows/emerald.yml'
+  pull_request:
+    paths:
+      - 'emerald/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulation:
+    name: Simulation tests and sandbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: emerald
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit and scenario tests
+        run: ./gradlew -Pemerald.coreOnly=true test --no-daemon
+      - name: End-to-end sandbox run
+        run: ./gradlew -Pemerald.coreOnly=true :simulation-core:sandbox :simulation-core:replay --no-daemon
+      - name: Replay page
+        run: python3 tools/build_replay_page.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: simulation-reports
+          path: |
+            emerald/simulation-core/build/reports/tests/
+            emerald/ai/build/reports/tests/
+            emerald/simulation-core/build/sandbox-report.md
+            emerald/build/emerald-replay.html
+
+  mod:
+    name: Mod build and GameTests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: emerald
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build the mod jar
+        run: ./gradlew build --no-daemon --stacktrace
+      - name: Run GameTests
+        run: ./gradlew runGameTestServer --no-daemon
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emerald-mod
+          path: |
+            emerald/minecraft-neoforge/build/libs/*.jar
+            emerald/minecraft-neoforge/build/reports/
+            emerald/minecraft-neoforge/runs/gameTestServer/logs/
+            emerald/minecraft-neoforge/build/run/gameTestServer/logs/
