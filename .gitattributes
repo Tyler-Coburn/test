@@ -1,1 +1,6 @@
 * text=auto eol=crlf
+
+# Scripts and CI config must keep LF line endings
+*.sh text eol=lf
+.claude/** text eol=lf
+.github/** text eol=lf
