@@ -6,6 +6,8 @@ A Minecraft civilization mod. Villagers are persistent citizens who observe the 
 - Mod id: `emerald`
 - Design source of truth: *Emerald — AI Villager Civilization Mod Master System & Design Spec*. The rules that matter most are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+**Setting up?** Start with [docs/SETUP.md](docs/SETUP.md): versions, required hosts, your PC, playing with Prism Launcher, a dedicated server, Ollama, Claude Code cloud sessions and CI. `tools/doctor.sh` checks a machine.
+
 ## Layout
 
 | Module | What it is | Depends on Minecraft? |

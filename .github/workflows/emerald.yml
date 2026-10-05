@@ -18,7 +18,7 @@ permissions:
 jobs:
   simulation:
     name: Simulation tests and sandbox
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
       run:
@@ -48,7 +48,7 @@ jobs:
 
   mod:
     name: Mod build and GameTests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     defaults:
       run:
